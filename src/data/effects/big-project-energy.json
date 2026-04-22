@@ -1,0 +1,7 @@
+{
+  "id": "big-project-energy",
+  "label": "Big project energy",
+  "emoji": "🛠️",
+  "kind": "mode",
+  "mutex": "focus"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "task-queued",
+  "label": "Task queued",
+  "emoji": "🧑‍🔧",
+  "kind": "queued"
+}

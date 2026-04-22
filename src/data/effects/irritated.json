@@ -1,0 +1,7 @@
+{
+  "id": "irritated",
+  "label": "Irritated",
+  "emoji": "😕",
+  "kind": "mood",
+  "mutex": "mood"
+}

@@ -1,0 +1,7 @@
+{
+  "id": "heads-down",
+  "label": "Heads-down working",
+  "emoji": "⌨️",
+  "kind": "mode",
+  "mutex": "focus"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "bookshelf-fiction",
+  "label": "Fiction",
+  "contents": [
+    { "type": "item", "label": "The Dispossessed" },
+    { "type": "item", "label": "Piranesi" },
+    { "type": "item", "label": "Blood Meridian" }
+  ]
+}

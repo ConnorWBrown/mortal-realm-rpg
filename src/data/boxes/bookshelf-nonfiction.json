@@ -1,0 +1,8 @@
+{
+  "id": "bookshelf-nonfiction",
+  "label": "Non-fiction",
+  "contents": [
+    { "type": "item", "label": "Designing Data-Intensive Applications" },
+    { "type": "item", "label": "The Elements of Typographic Style" }
+  ]
+}

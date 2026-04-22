@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(curl -sf http://localhost:5173/ -o /tmp/mr-index.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -sf -o /dev/null -w \"index: %{http_code}\\\\n\" \"http://localhost:5173/\")",
+      "Bash(curl -sf -o /dev/null -w \"loop: %{http_code}\\\\n\" \"http://localhost:5173/src/game/loop.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"menu: %{http_code}\\\\n\" \"http://localhost:5173/src/ui/menu.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"box: %{http_code}\\\\n\" \"http://localhost:5173/src/world/box.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"effect.ts: %{http_code}\\\\n\" \"http://localhost:5173/src/world/effect.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"persist: %{http_code}\\\\n\" \"http://localhost:5173/src/world/persist.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"hud: %{http_code}\\\\n\" \"http://localhost:5173/src/render/hud.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"adderall.json: %{http_code}\\\\n\" \"http://localhost:5173/src/data/effects/adderall.json\")"
+    ]
+  }
+}

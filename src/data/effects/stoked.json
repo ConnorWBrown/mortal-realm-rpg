@@ -1,0 +1,7 @@
+{
+  "id": "stoked",
+  "label": "Stoked",
+  "emoji": "🎉",
+  "kind": "mood",
+  "mutex": "mood"
+}

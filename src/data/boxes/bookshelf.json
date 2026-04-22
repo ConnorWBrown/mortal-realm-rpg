@@ -1,0 +1,9 @@
+{
+  "id": "bookshelf",
+  "label": "Bookshelf",
+  "contents": [
+    { "type": "box", "boxId": "bookshelf-fiction" },
+    { "type": "box", "boxId": "bookshelf-nonfiction" },
+    { "type": "item", "label": "Framed photo" }
+  ]
+}

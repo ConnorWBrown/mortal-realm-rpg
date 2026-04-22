@@ -1,0 +1,9 @@
+{
+  "id": "desk-drawer-tools",
+  "label": "Tools pouch",
+  "contents": [
+    { "type": "item", "label": "Tiny screwdriver set" },
+    { "type": "item", "label": "Tweezers" },
+    { "type": "item", "label": "Spudger" }
+  ]
+}
