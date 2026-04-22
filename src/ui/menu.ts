@@ -2,6 +2,8 @@ import type { View } from "../render/canvas";
 import type { InputState } from "../game/input";
 import { getBox, type Box, type BoxEntry } from "../world/box";
 import { getEffect, type ActiveEffect } from "../world/effect";
+import { draw9Slice, type Assets } from "../render/assets";
+import { drawEffectIcon, ICON_SIZE } from "../render/effectIcons";
 
 export type MenuFrame =
   | { kind: "box"; title: string; entries: BoxEntry[]; cursor: number }
@@ -85,10 +87,8 @@ const PANEL_BORDER_INNER = "#6b4a3a";
 const TEXT = "#e8d8b0";
 const TEXT_DIM = "#8a7a5a";
 const CURSOR = "#e8d8b0";
-const EMOJI_FONT =
-  '11px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", system-ui, sans-serif';
 
-export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers) {
+export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers, assets: Assets | null) {
   const top = stack.frames[stack.frames.length - 1];
   if (!top) return;
 
@@ -111,9 +111,13 @@ export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers)
   ctx.fillStyle = "rgba(0,0,0,0.4)";
   ctx.fillRect(x + 2, y + 2, w, h);
 
-  ctx.fillStyle = PANEL_BG;
-  ctx.fillRect(x, y, w, h);
-  drawDoubleBorder(ctx, x, y, w, h);
+  if (assets) {
+    draw9Slice(ctx, assets.panel, x, y, w, h);
+  } else {
+    ctx.fillStyle = PANEL_BG;
+    ctx.fillRect(x, y, w, h);
+    drawDoubleBorder(ctx, x, y, w, h);
+  }
 
   ctx.fillStyle = TEXT;
   drawText(ctx, top.title, x + pad, y + pad);
@@ -146,14 +150,10 @@ export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers)
         const rowY = bodyY + i * lineH;
         drawListCursor(ctx, i === top.cursor, x + pad, rowY);
         const def = getEffect(active.effectId);
-        ctx.save();
-        ctx.textBaseline = "top";
-        ctx.font = EMOJI_FONT;
-        ctx.fillText(def.emoji, x + pad + 8, rowY - 2);
-        ctx.restore();
+        drawEffectIcon(ctx, active.effectId, x + pad + 8, rowY - 2);
         ctx.fillStyle = i === top.cursor ? TEXT : TEXT_DIM;
         const label = active.detail ? `${def.label}: ${active.detail}` : def.label;
-        drawText(ctx, truncate(label, 28), x + pad + 8 + 14, rowY);
+        drawText(ctx, truncate(label, 26), x + pad + 8 + ICON_SIZE + 2, rowY);
       });
     }
   }

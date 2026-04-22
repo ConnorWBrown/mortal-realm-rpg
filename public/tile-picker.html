@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Kenney tile picker</title>
+    <style>
+      body { margin: 0; background: #223; color: #e8d8b0; font: 11px ui-monospace, monospace; padding: 8px; }
+      canvas { image-rendering: pixelated; background: rgba(0,0,0,0.2); }
+      .info { margin: 4px 0 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="info">Tilesheet with grid overlay (tiles are 16x16 with 1px margin). Index shown at top-left of each tile. Hover to zoom.</div>
+    <canvas id="c"></canvas>
+    <canvas id="zoom" width="160" height="160" style="position: fixed; right: 8px; top: 8px; border: 1px solid #c8a060;"></canvas>
+    <div id="pos" style="position: fixed; right: 180px; top: 8px;"></div>
+    <script>
+      const TILE = 16;
+      const MARGIN = 1;
+      const STEP = TILE + MARGIN;
+      const SCALE = 3;
+      const img = new Image();
+      img.src = "/assets/roguelike-indoors/Tilesheets/roguelikeIndoor_transparent.png";
+      img.onload = () => {
+        const cols = Math.floor((img.width + MARGIN) / STEP);
+        const rows = Math.floor((img.height + MARGIN) / STEP);
+        const c = document.getElementById("c");
+        c.width = img.width * SCALE;
+        c.height = img.height * SCALE;
+        const ctx = c.getContext("2d");
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(img, 0, 0, c.width, c.height);
+        // Grid + indices
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.font = "bold 9px ui-monospace";
+        ctx.textBaseline = "top";
+        for (let r = 0; r < rows; r++) {
+          for (let cc = 0; cc < cols; cc++) {
+            const x = cc * STEP * SCALE;
+            const y = r * STEP * SCALE;
+            ctx.strokeStyle = "rgba(255,255,255,0.15)";
+            ctx.strokeRect(x + 0.5, y + 0.5, TILE * SCALE, TILE * SCALE);
+            const idx = r * cols + cc;
+            const label = `${idx}`;
+            ctx.fillStyle = "rgba(0,0,0,0.7)";
+            ctx.fillRect(x + 2, y + 2, label.length * 6 + 2, 10);
+            ctx.fillStyle = "#ffef99";
+            ctx.fillText(label, x + 3, y + 3);
+          }
+        }
+
+        // Zoom on hover
+        const zc = document.getElementById("zoom").getContext("2d");
+        zc.imageSmoothingEnabled = false;
+        const pos = document.getElementById("pos");
+        c.addEventListener("mousemove", (ev) => {
+          const rect = c.getBoundingClientRect();
+          const px = (ev.clientX - rect.left) / SCALE;
+          const py = (ev.clientY - rect.top) / SCALE;
+          const cc = Math.floor(px / STEP);
+          const rr = Math.floor(py / STEP);
+          const idx = rr * cols + cc;
+          pos.textContent = `col ${cc} row ${rr} → index ${idx}  (coord: ${cc*STEP}, ${rr*STEP})`;
+          zc.clearRect(0, 0, 160, 160);
+          zc.drawImage(img, cc * STEP, rr * STEP, TILE, TILE, 0, 0, 160, 160);
+        });
+      };
+    </script>
+  </body>
+</html>

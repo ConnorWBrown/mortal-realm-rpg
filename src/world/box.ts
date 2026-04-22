@@ -7,6 +7,8 @@ export type BoxEntry =
 export interface Box {
   id: string;
   label: string;
+  /** Tilesheet coords (col, row) in roguelikeIndoor_transparent.png. Optional for sub-boxes. */
+  sprite?: { col: number; row: number };
   contents: BoxEntry[];
 }
 

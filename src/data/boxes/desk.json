@@ -1,6 +1,7 @@
 {
   "id": "desk",
   "label": "Desk",
+  "sprite": { "col": 4, "row": 8 },
   "contents": [
     { "type": "item", "label": "Laptop (14\" MBP)" },
     { "type": "item", "label": "External monitor" },
