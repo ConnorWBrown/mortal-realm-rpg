@@ -20,7 +20,14 @@
       "Bash(sips -s format png --cropOffset 200 0 --cropToHeightWidth 105 460 /Users/connor/dev/life-rpg/public/assets/roguelike-indoors/Tilesheets/roguelikeIndoor_transparent.png --out bottom.png)",
       "Bash(sips -g pixelWidth -g pixelHeight /tmp/mr-tiles/top.png /tmp/mr-tiles/middle.png /tmp/mr-tiles/bottom.png)",
       "Bash(python3 -m pip install --quiet --user Pillow)",
-      "Bash(sips --help)"
+      "Bash(sips --help)",
+      "Bash(curl -sf -o /dev/null -w \"tilesheet: %{http_code}\\\\n\" \"http://localhost:5173/assets/roguelike-indoors/Tilesheets/roguelikeIndoor_transparent.png\")",
+      "Bash(curl -sf -o /dev/null -w \"panel-003: %{http_code}\\\\n\" \"http://localhost:5173/assets/fantasy-ui-borders/PNG/Default/Panel/panel-003.png\")",
+      "Bash(curl -sf -o /dev/null -w \"tile-picker: %{http_code}\\\\n\" \"http://localhost:5173/tile-picker.html\")",
+      "Bash(curl -sf -o /dev/null -w \"effectIcons: %{http_code}\\\\n\" \"http://localhost:5173/src/render/effectIcons.ts\")",
+      "Bash(curl -sf -o /dev/null -w \"assets.ts: %{http_code}\\\\n\" \"http://localhost:5173/src/render/assets.ts\")",
+      "Bash(tee /tmp/mr-dev.log)",
+      "Bash(curl -sf -o /dev/null -w \"hud.ts: %{http_code}\\\\n\" \"http://localhost:5173/src/render/hud.ts\")"
     ]
   }
 }

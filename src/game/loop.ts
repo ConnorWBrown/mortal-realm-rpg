@@ -2,6 +2,7 @@ import { createInput, type Direction, type InputState } from "./input";
 import { createView, clear } from "../render/canvas";
 import { computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
 import { renderEffectHUD } from "../render/hud";
+import { loadAssets, type Assets } from "../render/assets";
 import { rooms, isWalkable, getBoxAt, resolveBox, type Room } from "../world/room";
 import { createPlayer, isMoving, type Player } from "../world/player";
 import { applyEffect, getEffect, removeEffectAt } from "../world/effect";
@@ -40,6 +41,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     applyPersisted(player, saved);
   }
   const menus: MenuStack = createMenuStack();
+  let assets: Assets | null = null;
+
+  loadAssets().then((loaded) => {
+    assets = loaded;
+  }).catch((err) => {
+    console.error("Asset load failed, continuing with placeholders", err);
+  });
 
   const handlers: MenuHandlers = {
     applyPotion(effectId, detail) {
@@ -113,10 +121,10 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     clear(view, "#1a1420");
     const cam = computeCamera(room, player, view);
     renderRoom(view, room, cam);
-    renderBoxes(view, room, cam);
+    renderBoxes(view, room, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    renderMenu(view, menus, handlers);
+    renderMenu(view, menus, handlers, assets);
   }
 
   return {
