@@ -1,6 +1,6 @@
 import { createInput, type Direction, type InputState } from "./input";
 import { createView, clear } from "../render/canvas";
-import { computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
+import { BG_COLOR, computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
 import { renderEffectHUD } from "../render/hud";
 import { loadAssets, type Assets } from "../render/assets";
 import { rooms, isWalkable, getBoxAt, resolveBox, type Room } from "../world/room";
@@ -118,9 +118,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   function render() {
-    clear(view, "#1a1420");
+    clear(view, BG_COLOR);
     const cam = computeCamera(room, player, view);
-    renderRoom(view, room, cam);
+    renderRoom(view, room, cam, assets);
     renderBoxes(view, room, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);

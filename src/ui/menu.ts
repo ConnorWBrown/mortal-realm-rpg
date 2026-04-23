@@ -2,7 +2,7 @@ import type { View } from "../render/canvas";
 import type { InputState } from "../game/input";
 import { getBox, type Box, type BoxEntry } from "../world/box";
 import { getEffect, type ActiveEffect } from "../world/effect";
-import { draw9Slice, type Assets } from "../render/assets";
+import type { Assets } from "../render/assets";
 import { drawEffectIcon, ICON_SIZE } from "../render/effectIcons";
 
 export type MenuFrame =
@@ -111,13 +111,10 @@ export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers,
   ctx.fillStyle = "rgba(0,0,0,0.4)";
   ctx.fillRect(x + 2, y + 2, w, h);
 
-  if (assets) {
-    draw9Slice(ctx, assets.panel, x, y, w, h);
-  } else {
-    ctx.fillStyle = PANEL_BG;
-    ctx.fillRect(x, y, w, h);
-    drawDoubleBorder(ctx, x, y, w, h);
-  }
+  void assets;
+  ctx.fillStyle = PANEL_BG;
+  ctx.fillRect(x, y, w, h);
+  drawDoubleBorder(ctx, x, y, w, h);
 
   ctx.fillStyle = TEXT;
   drawText(ctx, top.title, x + pad, y + pad);

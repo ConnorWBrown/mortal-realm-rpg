@@ -1,7 +1,7 @@
 {
   "id": "bookshelf",
   "label": "Bookshelf",
-  "sprite": { "col": 19, "row": 4 },
+  "sprite": { "col": 3, "row": 7 },
   "contents": [
     { "type": "box", "boxId": "bookshelf-fiction" },
     { "type": "box", "boxId": "bookshelf-nonfiction" },

@@ -5,17 +5,15 @@ import { drawTileCoord, type Assets } from "./assets";
 import { getBox } from "../world/box";
 
 export const TILE_SIZE = 16;
+export const BG_COLOR = "#3e2731";
 
-const FLOOR_BASE = "#3b2a22";
-const FLOOR_LIGHT = "#4a3a2a";
-const FLOOR_SPECKLE = "#2a1d15";
-const WALL_BASE = "#6b4a3a";
-const WALL_TOP = "#8a6a4a";
-const WALL_SHADOW = "#3a2820";
-const WALL_GROUT = "#2a1d15";
-const DOOR_FRAME = "#4a2a10";
-const DOOR_WOOD = "#8a5a2a";
-const DOOR_KNOB = "#efc040";
+// Kenney 1-bit pack tile coords (col, row). Legacy sheet is 32 cols.
+// Hand-picked from tile-picker.html visual inspection:
+//   wall  → col 0,  row 13  (brick pattern)
+//   door  → col 20, row 12
+const WALL_CR = { col: 0, row: 13 };
+const DOOR_CR = { col: 20, row: 12 };
+
 const PLAYER_BODY = "#e8d8b0";
 const PLAYER_SHADE = "#a89060";
 
@@ -36,7 +34,7 @@ export function computeCamera(room: Room, player: Player, view: View): Camera {
   return { x: camX * TILE_SIZE, y: camY * TILE_SIZE };
 }
 
-export function renderRoom(view: View, room: Room, cam: Camera) {
+export function renderRoom(view: View, room: Room, cam: Camera, assets: Assets | null) {
   const { ctx } = view;
   const startX = Math.max(0, Math.floor(cam.x / TILE_SIZE));
   const startY = Math.max(0, Math.floor(cam.y / TILE_SIZE));
@@ -46,9 +44,9 @@ export function renderRoom(view: View, room: Room, cam: Camera) {
   for (let y = startY; y < endY; y++) {
     for (let x = startX; x < endX; x++) {
       const kind = room.tiles[y][x];
-      const screenX = x * TILE_SIZE - cam.x;
-      const screenY = y * TILE_SIZE - cam.y;
-      drawTileKind(ctx, kind, screenX, screenY, x, y);
+      const sx = x * TILE_SIZE - cam.x;
+      const sy = y * TILE_SIZE - cam.y;
+      drawTileKind(ctx, kind, sx, sy, assets);
     }
   }
 }
@@ -58,101 +56,39 @@ function drawTileKind(
   kind: TileKind,
   x: number,
   y: number,
-  gx: number,
-  gy: number,
+  assets: Assets | null,
 ) {
   if (kind === "floor") {
-    drawFloor(ctx, x, y, gx, gy);
-  } else if (kind === "wall") {
-    drawWall(ctx, x, y, gx, gy);
+    // Floor is just the background colour — no sprite.
+    return;
+  }
+  if (!assets) {
+    // Fallback before assets load: solid block so walls/doors are visible.
+    ctx.fillStyle = kind === "wall" ? "#6b4a3a" : "#8a5a2a";
+    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    return;
+  }
+  if (kind === "wall") {
+    drawTileCoord(ctx, assets.indoor, WALL_CR.col, WALL_CR.row, x, y);
   } else if (kind === "door") {
-    drawFloor(ctx, x, y, gx, gy);
-    drawDoor(ctx, x, y);
+    drawTileCoord(ctx, assets.indoor, DOOR_CR.col, DOOR_CR.row, x, y);
   }
-}
-
-function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, gx: number, gy: number) {
-  ctx.fillStyle = FLOOR_BASE;
-  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-  // Subtle plank divisions every 4px horizontally.
-  ctx.fillStyle = FLOOR_LIGHT;
-  ctx.fillRect(x, y + 3, TILE_SIZE, 1);
-  ctx.fillRect(x, y + 11, TILE_SIZE, 1);
-  // Deterministic speckles per tile.
-  const seed = ((gx * 73856093) ^ (gy * 19349663)) >>> 0;
-  const pos = [seed & 15, (seed >> 4) & 15, (seed >> 8) & 15, (seed >> 12) & 15];
-  ctx.fillStyle = FLOOR_SPECKLE;
-  ctx.fillRect(x + pos[0], y + (pos[1] % 14) + 1, 1, 1);
-  ctx.fillRect(x + pos[2], y + (pos[3] % 14) + 1, 1, 1);
-}
-
-function drawWall(ctx: CanvasRenderingContext2D, x: number, y: number, gx: number, gy: number) {
-  ctx.fillStyle = WALL_BASE;
-  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-  // Brick pattern: offset every other row.
-  const rowOffset = (gy % 2) * 8;
-  ctx.fillStyle = WALL_GROUT;
-  // Horizontal grout lines
-  ctx.fillRect(x, y + 4, TILE_SIZE, 1);
-  ctx.fillRect(x, y + 11, TILE_SIZE, 1);
-  // Vertical grout every 8px with staggered offset
-  for (let gx2 = -8 + rowOffset; gx2 < TILE_SIZE; gx2 += 8) {
-    if (gx2 >= 0 && gx2 < TILE_SIZE) ctx.fillRect(x + gx2, y, 1, 4);
-    if (gx2 >= 0 && gx2 < TILE_SIZE) ctx.fillRect(x + gx2, y + 5, 1, 6);
-    if (gx2 >= 0 && gx2 < TILE_SIZE) ctx.fillRect(x + gx2, y + 12, 1, 4);
-  }
-  // Top highlight
-  ctx.fillStyle = WALL_TOP;
-  ctx.fillRect(x, y, TILE_SIZE, 1);
-  // Bottom shadow
-  ctx.fillStyle = WALL_SHADOW;
-  ctx.fillRect(x, y + TILE_SIZE - 1, TILE_SIZE, 1);
-  // Suppress unused param warning
-  void gx;
-}
-
-function drawDoor(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.fillStyle = DOOR_FRAME;
-  ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 2);
-  ctx.fillStyle = DOOR_WOOD;
-  ctx.fillRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 4);
-  ctx.fillStyle = DOOR_FRAME;
-  ctx.fillRect(x + 7, y + 3, 1, TILE_SIZE - 4);
-  ctx.fillStyle = DOOR_KNOB;
-  ctx.fillRect(x + 10, y + 8, 2, 2);
 }
 
 export function renderBoxes(view: View, room: Room, cam: Camera, assets: Assets | null) {
   const { ctx } = view;
   for (const p of room.boxes) {
-    const screenX = p.x * TILE_SIZE - cam.x;
-    const screenY = p.y * TILE_SIZE - cam.y;
-    if (
-      screenX + TILE_SIZE < 0 ||
-      screenY + TILE_SIZE < 0 ||
-      screenX > view.width ||
-      screenY > view.height
-    ) continue;
+    const sx = p.x * TILE_SIZE - cam.x;
+    const sy = p.y * TILE_SIZE - cam.y;
+    if (sx + TILE_SIZE < 0 || sy + TILE_SIZE < 0 || sx > view.width || sy > view.height) continue;
     const box = getBox(p.boxId);
     if (assets && box.sprite) {
-      drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, screenX, screenY);
+      drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, sx, sy);
     } else {
-      drawPlaceholderBox(ctx, screenX, screenY);
+      ctx.fillStyle = "#8a5a2a";
+      ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
     }
   }
-}
-
-function drawPlaceholderBox(ctx: CanvasRenderingContext2D, x: number, y: number) {
-  ctx.fillStyle = "#4a2a10";
-  ctx.fillRect(x + 1, y + 3, TILE_SIZE - 2, TILE_SIZE - 4);
-  ctx.fillStyle = "#8a5a2a";
-  ctx.fillRect(x + 2, y + 4, TILE_SIZE - 4, TILE_SIZE - 6);
-  ctx.fillStyle = "#c8a060";
-  ctx.fillRect(x + 1, y + 2, TILE_SIZE - 2, 4);
-  ctx.fillStyle = "#f0d890";
-  ctx.fillRect(x + 2, y + 3, TILE_SIZE - 4, 1);
-  ctx.fillStyle = "#4a2a10";
-  ctx.fillRect(x + 7, y + 6, 2, 3);
 }
 
 export function renderPlayer(view: View, player: Player, cam: Camera) {

@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Mortal Realm — compare</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #1a1420; color: #e8d8b0; font: 12px ui-monospace, monospace; }
+      .bar { padding: 6px 10px; display: flex; gap: 16px; align-items: center; border-bottom: 1px solid #443; }
+      .bar strong { color: #ffef99; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; height: calc(100% - 34px); }
+      .col { display: flex; flex-direction: column; border-right: 1px solid #443; }
+      .col:last-child { border-right: none; }
+      .label { padding: 4px 10px; background: #2a1f30; border-bottom: 1px solid #443; font-weight: bold; }
+      .label.left { color: #ffef99; }
+      .label.right { color: #9ad0ff; }
+      iframe { flex: 1; border: 0; width: 100%; background: #000; }
+    </style>
+  </head>
+  <body>
+    <div class="bar">
+      <strong>Mortal Realm — side-by-side</strong>
+      <span>left: <code>1bit-version</code> (this branch) · right: <code>main</code></span>
+    </div>
+    <div class="grid">
+      <div class="col">
+        <div class="label left">1bit-version · :5173</div>
+        <iframe src="http://localhost:5173/"></iframe>
+      </div>
+      <div class="col">
+        <div class="label right">main · :5174</div>
+        <iframe src="http://localhost:5174/"></iframe>
+      </div>
+    </div>
+  </body>
+</html>
