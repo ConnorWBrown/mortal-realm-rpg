@@ -1,4 +1,4 @@
-import type { Player } from "./player";
+import type { InventoryItem, Player, Quest } from "./player";
 import type { Direction } from "../game/input";
 import { effects, type ActiveEffect } from "./effect";
 
@@ -9,6 +9,8 @@ interface PersistedPlayer {
   y: number;
   facing: Direction;
   activeEffects: ActiveEffect[];
+  inventory?: InventoryItem[];
+  quests?: Quest[];
 }
 
 export function loadPlayer(): PersistedPlayer | null {
@@ -19,6 +21,8 @@ export function loadPlayer(): PersistedPlayer | null {
     if (typeof data.x !== "number" || typeof data.y !== "number") return null;
     // Drop any active effects whose definition no longer exists.
     data.activeEffects = (data.activeEffects ?? []).filter((a) => !!effects[a.effectId]);
+    data.inventory = Array.isArray(data.inventory) ? data.inventory : [];
+    data.quests = Array.isArray(data.quests) ? data.quests : [];
     return data;
   } catch {
     return null;
@@ -31,6 +35,8 @@ export function savePlayer(p: Player) {
     y: p.y,
     facing: p.facing,
     activeEffects: p.activeEffects,
+    inventory: p.inventory,
+    quests: p.quests,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -46,4 +52,6 @@ export function applyPersisted(p: Player, saved: PersistedPlayer) {
   p.moveFrom = { x: saved.x, y: saved.y };
   p.moveProgress = 1;
   p.activeEffects = saved.activeEffects;
+  p.inventory = saved.inventory ?? [];
+  p.quests = saved.quests ?? [];
 }

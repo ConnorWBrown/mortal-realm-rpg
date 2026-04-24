@@ -1,5 +1,5 @@
 import { createGame } from "./game/loop";
-import { bindKeyboard, bindTouch } from "./game/input";
+import { bindCanvasPointer, bindKeyboard, bindTouch } from "./game/input";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 if (!canvas) throw new Error("canvas#game not found");
@@ -8,6 +8,7 @@ const game = createGame(canvas);
 
 bindKeyboard(game.input);
 bindTouch(game.input, document.getElementById("touch-controls")!);
+bindCanvasPointer(game.input, canvas);
 
 fitCanvasToViewport(canvas);
 window.addEventListener("resize", () => fitCanvasToViewport(canvas));

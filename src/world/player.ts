@@ -1,6 +1,21 @@
 import type { Direction } from "../game/input";
 import type { ActiveEffect } from "./effect";
 
+export interface InventoryItem {
+  id: string;
+  label: string;
+  count?: number;
+}
+
+export type QuestState = "active" | "complete";
+
+export interface Quest {
+  id: string;
+  label: string;
+  state: QuestState;
+  detail?: string;
+}
+
 export interface Player {
   x: number;
   y: number;
@@ -9,6 +24,8 @@ export interface Player {
   moveProgress: number;
   moveFrom: { x: number; y: number };
   activeEffects: ActiveEffect[];
+  inventory: InventoryItem[];
+  quests: Quest[];
 }
 
 export function createPlayer(spawn: { x: number; y: number }): Player {
@@ -19,6 +36,8 @@ export function createPlayer(spawn: { x: number; y: number }): Player {
     moveProgress: 1,
     moveFrom: { ...spawn },
     activeEffects: [],
+    inventory: [],
+    quests: [],
   };
 }
 

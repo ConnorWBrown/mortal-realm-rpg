@@ -11,12 +11,18 @@ import {
   createMenuStack,
   isMenuOpen,
   openBoxMenu,
-  openStatsMenu,
   renderMenu,
   updateMenu,
   type MenuHandlers,
   type MenuStack,
 } from "../ui/menu";
+import {
+  createSidebar,
+  renderSidebar,
+  sidebarHitTest,
+  toggleTab,
+  type Sidebar,
+} from "../ui/sidebar";
 
 const MOVE_DURATION_MS = 140;
 const DIR_VEC: Record<Direction, { dx: number; dy: number }> = {
@@ -41,6 +47,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     applyPersisted(player, saved);
   }
   const menus: MenuStack = createMenuStack();
+  const sidebar: Sidebar = createSidebar();
   let assets: Assets | null = null;
 
   loadAssets().then((loaded) => {
@@ -77,6 +84,18 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   }
 
   function update(dt: number) {
+    // Sidebar clicks take priority over world input when no modal menu is open.
+    if (!isMenuOpen(menus)) {
+      const click = input.consumePointerClick();
+      if (click) {
+        const hit = sidebarHitTest(view, click.x, click.y);
+        if (hit) {
+          toggleTab(sidebar, hit);
+          return;
+        }
+      }
+    }
+
     if (isMenuOpen(menus)) {
       updateMenu(menus, input, handlers);
       return;
@@ -91,7 +110,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       return;
     }
     if (input.consumePress("b")) {
-      openStatsMenu(menus);
+      toggleTab(sidebar, "stats");
       return;
     }
     if (input.consumePress("a")) {
@@ -124,6 +143,19 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     renderBoxes(view, room, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
+    // Sidebar is hidden while a modal menu (box/note) is open so the two UIs don't fight.
+    if (!isMenuOpen(menus)) {
+      renderSidebar(
+        view,
+        sidebar,
+        {
+          effects: player.activeEffects,
+          inventory: player.inventory,
+          quests: player.quests,
+        },
+        assets,
+      );
+    }
     renderMenu(view, menus, handlers, assets);
   }
 

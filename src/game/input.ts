@@ -2,18 +2,27 @@ export type Direction = "up" | "down" | "left" | "right";
 export type Button = "a" | "b";
 export type InputName = Direction | Button;
 
+export interface PointerClick {
+  /** Canvas-space pixel coordinates. */
+  x: number;
+  y: number;
+}
+
 export interface InputState {
   held: Set<InputName>;
   pressedThisFrame: Set<InputName>;
   consumePress(name: InputName): boolean;
+  consumePointerClick(): PointerClick | null;
   _press(name: InputName): void;
   _release(name: InputName): void;
+  _pointerDown(x: number, y: number): void;
   _endFrame(): void;
 }
 
 export function createInput(): InputState {
   const held = new Set<InputName>();
   const pressedThisFrame = new Set<InputName>();
+  const pointerClicks: PointerClick[] = [];
   return {
     held,
     pressedThisFrame,
@@ -24,12 +33,18 @@ export function createInput(): InputState {
       }
       return false;
     },
+    consumePointerClick() {
+      return pointerClicks.shift() ?? null;
+    },
     _press(name) {
       if (!held.has(name)) pressedThisFrame.add(name);
       held.add(name);
     },
     _release(name) {
       held.delete(name);
+    },
+    _pointerDown(x, y) {
+      pointerClicks.push({ x, y });
     },
     _endFrame() {
       pressedThisFrame.clear();
@@ -85,5 +100,22 @@ export function bindTouch(input: InputState, root: HTMLElement) {
     el.addEventListener("mousedown", press);
     el.addEventListener("mouseup", release);
     el.addEventListener("mouseleave", release);
+  });
+}
+
+/**
+ * Translate pointerdown events on the game canvas into canvas-space clicks.
+ * Accounts for the CSS `max-width: 100% / max-height: 100%` scaling so the
+ * reported coordinates match the logical canvas resolution.
+ */
+export function bindCanvasPointer(input: InputState, canvas: HTMLCanvasElement) {
+  canvas.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    input._pointerDown(x, y);
   });
 }
