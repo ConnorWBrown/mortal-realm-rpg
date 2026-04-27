@@ -16,10 +16,12 @@ window.addEventListener("resize", () => fitCanvasToViewport(canvas));
 game.start();
 
 function fitCanvasToViewport(c: HTMLCanvasElement) {
-  // Canvas internal resolution stays 320x240 (pixelated scaling via CSS).
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const scale = Math.max(1, Math.min(Math.floor(vw / c.width), Math.floor(vh / c.height)));
-  c.style.width = `${c.width * scale}px`;
-  c.style.height = `${c.height * scale}px`;
+  const aspect = c.width / c.height;
+  // 75% of viewport width; shrink if that would exceed viewport height
+  const w = Math.min(vw * 0.75, vh * aspect);
+  const h = w / aspect;
+  c.style.width = `${w}px`;
+  c.style.height = `${h}px`;
 }
