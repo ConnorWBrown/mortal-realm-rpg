@@ -28,7 +28,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 export async function loadAssets(): Promise<Assets> {
   const indoorImg = await loadImage(
-    "/assets/kenney_1-bit-pack/Tilemap/tileset_legacy.png",
+    `${import.meta.env.BASE_URL}assets/kenney_1-bit-pack/Tilemap/tileset_legacy.png`,
   );
   const tile = 16;
   const margin = 1;
