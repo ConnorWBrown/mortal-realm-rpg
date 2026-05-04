@@ -1,0 +1,10 @@
+{
+  "id": "keep-tidy",
+  "label": "Keep the house tidy",
+  "category": "maintenance",
+  "active": true,
+  "tasks": [
+    { "id": "dishes", "label": "Do the dishes" },
+    { "id": "laundry", "label": "Fold the laundry" }
+  ]
+}

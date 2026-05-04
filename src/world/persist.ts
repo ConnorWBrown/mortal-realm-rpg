@@ -1,6 +1,7 @@
-import type { InventoryItem, Player, Quest } from "./player";
+import type { InventoryItem, Player } from "./player";
 import type { Direction } from "../game/input";
 import { effects, type ActiveEffect } from "./effect";
+import { ensureDefaultQuest, mergeWithSeeds, type Quest } from "./quest";
 
 const STORAGE_KEY = "mortal-realm:player:v1";
 
@@ -11,6 +12,7 @@ interface PersistedPlayer {
   activeEffects: ActiveEffect[];
   inventory?: InventoryItem[];
   quests?: Quest[];
+  now?: string;
 }
 
 export function loadPlayer(): PersistedPlayer | null {
@@ -22,7 +24,8 @@ export function loadPlayer(): PersistedPlayer | null {
     // Drop any active effects whose definition no longer exists.
     data.activeEffects = (data.activeEffects ?? []).filter((a) => !!effects[a.effectId]);
     data.inventory = Array.isArray(data.inventory) ? data.inventory : [];
-    data.quests = Array.isArray(data.quests) ? data.quests : [];
+    data.quests = ensureDefaultQuest(mergeWithSeeds(Array.isArray(data.quests) ? data.quests : []));
+    data.now = typeof data.now === "string" ? data.now : "";
     return data;
   } catch {
     return null;
@@ -37,6 +40,7 @@ export function savePlayer(p: Player) {
     activeEffects: p.activeEffects,
     inventory: p.inventory,
     quests: p.quests,
+    now: p.now,
   };
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -54,4 +58,5 @@ export function applyPersisted(p: Player, saved: PersistedPlayer) {
   p.activeEffects = saved.activeEffects;
   p.inventory = saved.inventory ?? [];
   p.quests = saved.quests ?? [];
+  p.now = saved.now ?? "";
 }

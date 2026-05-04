@@ -1,0 +1,11 @@
+{
+  "id": "ship-v1",
+  "label": "Ship Mortal Realm v1",
+  "category": "project",
+  "active": true,
+  "tasks": [
+    { "id": "quest-log", "label": "Design the quest log UI" },
+    { "id": "second-room", "label": "Build a second room + door transitions" },
+    { "id": "pick-up-items", "label": "Let the player pick up items from boxes" }
+  ]
+}

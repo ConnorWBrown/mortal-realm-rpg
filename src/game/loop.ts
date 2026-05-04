@@ -8,6 +8,13 @@ import { createPlayer, isMoving, type Player } from "../world/player";
 import { applyEffect, getEffect, removeEffectAt } from "../world/effect";
 import { applyPersisted, loadPlayer, savePlayer } from "../world/persist";
 import {
+  addTaskToDefault,
+  ensureDefaultQuest,
+  findQuest,
+  mergeWithSeeds,
+  toggleQuestActive,
+} from "../world/quest";
+import {
   createMenuStack,
   isMenuOpen,
   openBoxMenu,
@@ -19,10 +26,11 @@ import {
 import {
   createSidebar,
   renderSidebar,
-  sidebarHitTest,
+  sidebarClick,
   toggleTab,
   type Sidebar,
 } from "../ui/sidebar";
+import { bindNowBox, type NowBox } from "../ui/now";
 
 const MOVE_DURATION_MS = 140;
 const DIR_VEC: Record<Direction, { dx: number; dy: number }> = {
@@ -46,9 +54,28 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   if (saved && isWalkable(room, saved.x, saved.y)) {
     applyPersisted(player, saved);
   }
+  // Seed quests (merges any newly-added seed JSON files; always keeps a Default quest).
+  player.quests = ensureDefaultQuest(mergeWithSeeds(player.quests));
+
   const menus: MenuStack = createMenuStack();
   const sidebar: Sidebar = createSidebar();
   let assets: Assets | null = null;
+
+  const nowBox: NowBox = bindNowBox({
+    initialText: player.now,
+    onChange(text) {
+      player.now = text;
+      savePlayer(player);
+    },
+    onSubmit(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      player.quests = addTaskToDefault(player.quests, trimmed);
+      player.now = trimmed;
+      nowBox.setText(trimmed);
+      savePlayer(player);
+    },
+  });
 
   loadAssets().then((loaded) => {
     assets = loaded;
@@ -88,9 +115,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     if (!isMenuOpen(menus)) {
       const click = input.consumePointerClick();
       if (click) {
-        const hit = sidebarHitTest(view, click.x, click.y);
-        if (hit) {
-          toggleTab(sidebar, hit);
+        const action = sidebarClick(view, sidebar, click.x, click.y);
+        if (action) {
+          dispatchSidebarAction(action);
           return;
         }
       }
@@ -100,6 +127,9 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       updateMenu(menus, input, handlers);
       return;
     }
+    // Game input is suppressed while the Now input is focused.
+    if (nowBox.isFocused()) return;
+
     if (isMoving(player)) {
       moveElapsed += dt;
       player.moveProgress = Math.min(1, moveElapsed / MOVE_DURATION_MS);
@@ -136,6 +166,44 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     }
   }
 
+  function dispatchSidebarAction(action: ReturnType<typeof sidebarClick> & {}): void {
+    if (!action) return;
+    switch (action.kind) {
+      case "toggleTab":
+        toggleTab(sidebar, action.tab);
+        return;
+      case "toggleQuestActive":
+        player.quests = toggleQuestActive(player.quests, action.questId);
+        savePlayer(player);
+        return;
+      case "openQuest":
+        sidebar.questQuestId = action.questId;
+        return;
+      case "backToQuestList":
+        sidebar.questQuestId = null;
+        return;
+      case "selectTask": {
+        const q = findQuest(player.quests, action.questId);
+        const t = q?.tasks.find((x) => x.id === action.taskId);
+        if (t) {
+          player.now = t.label;
+          nowBox.setText(t.label);
+          savePlayer(player);
+        }
+        return;
+      }
+      case "selectQuest": {
+        const q = findQuest(player.quests, action.questId);
+        if (q) {
+          player.now = q.label;
+          nowBox.setText(q.label);
+          savePlayer(player);
+        }
+        return;
+      }
+    }
+  }
+
   function render() {
     clear(view, BG_COLOR);
     const cam = computeCamera(room, player, view);
@@ -143,7 +211,6 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     renderBoxes(view, room, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    // Sidebar is hidden while a modal menu (box/note) is open so the two UIs don't fight.
     if (!isMenuOpen(menus)) {
       renderSidebar(
         view,

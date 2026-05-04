@@ -70,17 +70,26 @@ const KEY_MAP: Record<string, InputName> = {
 
 export function bindKeyboard(input: InputState) {
   window.addEventListener("keydown", (e) => {
+    if (isTextInputFocused()) return; // let the Now box (or any other input) type freely
     const name = KEY_MAP[e.key];
     if (!name) return;
     e.preventDefault();
     if (!e.repeat) input._press(name);
   });
   window.addEventListener("keyup", (e) => {
+    if (isTextInputFocused()) return;
     const name = KEY_MAP[e.key];
     if (!name) return;
     e.preventDefault();
     input._release(name);
   });
+}
+
+function isTextInputFocused(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
 }
 
 export function bindTouch(input: InputState, root: HTMLElement) {

@@ -1,0 +1,10 @@
+{
+  "id": "read-more",
+  "label": "Read more this year",
+  "category": "sidequests",
+  "active": true,
+  "tasks": [
+    { "id": "finish-novel", "label": "Finish the novel on the shelf" },
+    { "id": "start-nonfic", "label": "Pick a new nonfiction book" }
+  ]
+}

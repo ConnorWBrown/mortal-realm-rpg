@@ -29,12 +29,55 @@
         display: grid;
         place-items: center;
       }
+      #canvas-wrap {
+        position: relative;
+        display: inline-block;
+        line-height: 0;
+      }
       canvas {
         image-rendering: pixelated;
         image-rendering: crisp-edges;
         display: block;
         max-width: 100%;
         max-height: 100%;
+      }
+      #now-box {
+        position: absolute;
+        top: 1.5%;
+        left: 1.5%;
+        background: rgba(26, 20, 32, 0.9);
+        border: 1px solid #c8a060;
+        box-shadow: inset 0 0 0 1px #6b4a3a;
+        padding: 3px 6px;
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        font: 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        color: #e8d8b0;
+        line-height: 1.2;
+        max-width: 42%;
+      }
+      #now-box .now-label {
+        color: #ffef99;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+      }
+      #now-box input {
+        background: transparent;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        color: inherit;
+        font: inherit;
+        width: 120px;
+        outline: none;
+        caret-color: #e8d8b0;
+      }
+      #now-box input::placeholder {
+        color: #8a7a5a;
+      }
+      #now-box:focus-within {
+        border-color: #ffef99;
       }
       #touch-controls {
         position: fixed;
@@ -84,7 +127,13 @@
   </head>
   <body>
     <div id="game-root">
-      <canvas id="game" width="320" height="240"></canvas>
+      <div id="canvas-wrap">
+        <canvas id="game" width="320" height="240"></canvas>
+        <form id="now-box" autocomplete="off" onsubmit="return false">
+          <span class="now-label">Now</span>
+          <input id="now-input" type="text" maxlength="60" placeholder="what are you doing?" />
+        </form>
+      </div>
     </div>
     <div id="touch-controls" aria-hidden="true">
       <div class="touch-dpad">

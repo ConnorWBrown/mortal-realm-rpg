@@ -1,19 +1,13 @@
 import type { Direction } from "../game/input";
 import type { ActiveEffect } from "./effect";
+import type { Quest } from "./quest";
+
+export type { Quest } from "./quest";
 
 export interface InventoryItem {
   id: string;
   label: string;
   count?: number;
-}
-
-export type QuestState = "active" | "complete";
-
-export interface Quest {
-  id: string;
-  label: string;
-  state: QuestState;
-  detail?: string;
 }
 
 export interface Player {
@@ -26,6 +20,8 @@ export interface Player {
   activeEffects: ActiveEffect[];
   inventory: InventoryItem[];
   quests: Quest[];
+  /** Free-text "Now" field shown top-left. Populated by selecting a task/quest or typed directly. */
+  now: string;
 }
 
 export function createPlayer(spawn: { x: number; y: number }): Player {
@@ -38,6 +34,7 @@ export function createPlayer(spawn: { x: number; y: number }): Player {
     activeEffects: [],
     inventory: [],
     quests: [],
+    now: "",
   };
 }
 
