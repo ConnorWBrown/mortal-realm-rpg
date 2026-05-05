@@ -1,7 +1,10 @@
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
+const base = "/mortal-realm-rpg/";
+
 export default defineConfig({
+  base,
   plugins: [
     VitePWA({
       registerType: "autoUpdate",
@@ -14,7 +17,7 @@ export default defineConfig({
         background_color: "#1a1420",
         display: "fullscreen",
         orientation: "any",
-        start_url: "/",
+        start_url: base,
         icons: [
           {
             src: "favicon.svg",
