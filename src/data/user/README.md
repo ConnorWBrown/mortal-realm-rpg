@@ -57,9 +57,32 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
   `size`-generated room, floor tiles are the inner `blocksForDimension(size)`
   square, i.e. `x` and `y` in `[1, blocksForDimension(size)]` (index 0 and
   the last index are the wall ring).
-- `boxes` — array of `{ "x": number, "y": number, "boxId": string }` placing a
-  box (see below) on a floor tile. `boxId` must reference a real box id
-  (default or user-defined) or the game will fail to load.
+- `boxes` — array of real-world-anchored placements:
+  ```json
+  {
+    "boxId": "desk",
+    "x": { "fromWall": "left", "offset": { "feet": 1, "inches": 0 } },
+    "y": { "fromWall": "top", "offset": { "feet": 0, "inches": 0 } }
+  }
+  ```
+  `boxId` must reference a real box id (default or user-defined) with a
+  `size` (see Box schema below) or the game will fail to load. `x.fromWall`
+  is `"left"` or `"right"`; `y.fromWall` is `"top"` or `"bottom"`; `offset`
+  is the real-world distance from that wall to the box's near edge —
+  `{ "feet": 0, "inches": 0 }` means flush against it. `fromWall: "right"`
+  or `"bottom"` requires the room to have a `size` (there's no far wall to
+  measure from otherwise).
+
+  The box's `size` is floored to blocks (minimum 1) for its footprint, and
+  its offset floored the same way for its position — see
+  `src/world/measure.ts` for why objects round down while rooms round up.
+  At load time the room checks the box's *true* (unrounded) rectangle
+  against the room's true interior and against every other box's true
+  rectangle; if something doesn't actually fit or two boxes actually
+  overlap, it's logged as a console warning but the room still loads and
+  renders the approximate block layout regardless. This assumes a room with
+  a one-block wall ring around a rectangular interior — true of every
+  `size`-generated room.
 
 ## Box schema
 
@@ -72,6 +95,12 @@ every entry type). Fields:
 - `sprite` — optional `{ "col": number, "row": number }` tile coordinates in
   the roguelike-indoors tileset. Omit for boxes that are only ever nested
   inside another box (never placed directly in a room).
+- `size` — `{ "width": {feet, inches}, "depth": {feet, inches} }`, the
+  box's real-world footprint (`width` runs along its placement's x-axis,
+  `depth` along its y-axis). Required for any box a room places directly
+  (see `boxes` above); optional for boxes that only ever live nested inside
+  another box's `contents` (drawers, sub-boxes). Also shown as a subtitle
+  under the title when the box is opened in-game.
 - `contents` — array of entries, each one of:
   - `{ "type": "item", "label": string, "note"?: string }`
   - `{ "type": "note", "label": string, "text": string }`
