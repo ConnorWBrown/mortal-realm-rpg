@@ -4,7 +4,15 @@
   "size": { "feet": 16, "inches": 0 },
   "spawn": { "x": 2, "y": 3 },
   "boxes": [
-    { "x": 2, "y": 2, "boxId": "desk" },
-    { "x": 4, "y": 2, "boxId": "bookshelf" }
+    {
+      "boxId": "desk",
+      "x": { "fromWall": "left", "offset": { "feet": 1, "inches": 0 } },
+      "y": { "fromWall": "top", "offset": { "feet": 0, "inches": 0 } }
+    },
+    {
+      "boxId": "bookshelf",
+      "x": { "fromWall": "right", "offset": { "feet": 0, "inches": 0 } },
+      "y": { "fromWall": "top", "offset": { "feet": 1, "inches": 0 } }
+    }
   ]
 }
