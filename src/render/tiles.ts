@@ -78,15 +78,21 @@ function drawTileKind(
 export function renderBoxes(view: View, room: Room, cam: Camera, assets: Assets | null) {
   const { ctx } = view;
   for (const p of room.boxes) {
-    const sx = p.x * TILE_SIZE - cam.x;
-    const sy = p.y * TILE_SIZE - cam.y;
-    if (sx + TILE_SIZE < 0 || sy + TILE_SIZE < 0 || sx > view.width || sy > view.height) continue;
     const box = getBox(p.boxId);
-    if (assets && box.sprite) {
-      drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, sx, sy);
-    } else {
-      ctx.fillStyle = "#8a5a2a";
-      ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+    // Multi-block footprints don't have bespoke art yet, so tile the single
+    // sprite/fallback across every cell — same approach as wall tiling.
+    for (let dy = 0; dy < p.depthBlocks; dy++) {
+      for (let dx = 0; dx < p.widthBlocks; dx++) {
+        const sx = (p.x + dx) * TILE_SIZE - cam.x;
+        const sy = (p.y + dy) * TILE_SIZE - cam.y;
+        if (sx + TILE_SIZE < 0 || sy + TILE_SIZE < 0 || sx > view.width || sy > view.height) continue;
+        if (assets && box.sprite) {
+          drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, sx, sy);
+        } else {
+          ctx.fillStyle = "#8a5a2a";
+          ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+        }
+      }
     }
   }
 }

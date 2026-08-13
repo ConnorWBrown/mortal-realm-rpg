@@ -1,14 +1,29 @@
+import type { Dimension } from "./measure";
+
 export type BoxEntry =
   | { type: "item"; label: string; note?: string }
   | { type: "box"; boxId: string }
   | { type: "note"; label: string; text: string }
   | { type: "potion"; effectId: string; label?: string; detail?: string };
 
+/** Real-world footprint: `width` runs along a placement's x-axis, `depth` along its y-axis. */
+export interface BoxSize {
+  width: Dimension;
+  depth: Dimension;
+}
+
 export interface Box {
   id: string;
   label: string;
   /** Tilesheet coords (col, row) in roguelikeIndoor_transparent.png. Optional for sub-boxes. */
   sprite?: { col: number; row: number };
+  /**
+   * Real-world size. Required for any box a room places directly (see
+   * `src/world/room.ts`), since placement/footprint math is derived from it.
+   * Omit for boxes that only ever live nested inside another box's
+   * `contents` (drawers, sub-boxes) and are never placed in a room.
+   */
+  size?: BoxSize;
   contents: BoxEntry[];
 }
 

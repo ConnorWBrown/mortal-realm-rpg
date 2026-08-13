@@ -2,11 +2,12 @@ import type { View } from "../render/canvas";
 import type { InputState } from "../game/input";
 import { getBox, type Box, type BoxEntry } from "../world/box";
 import { getEffect, type ActiveEffect } from "../world/effect";
+import { formatDimension } from "../world/measure";
 import type { Assets } from "../render/assets";
 import { drawEffectIcon, ICON_SIZE } from "../render/effectIcons";
 
 export type MenuFrame =
-  | { kind: "box"; title: string; entries: BoxEntry[]; cursor: number }
+  | { kind: "box"; title: string; entries: BoxEntry[]; cursor: number; dimensions?: string }
   | { kind: "note"; title: string; text: string }
   | { kind: "stats"; title: string; cursor: number };
 
@@ -29,7 +30,10 @@ export function isMenuOpen(stack: MenuStack): boolean {
 }
 
 export function openBoxMenu(stack: MenuStack, box: Box) {
-  stack.frames.push({ kind: "box", title: box.label, entries: box.contents, cursor: 0 });
+  const dimensions = box.size
+    ? `${formatDimension(box.size.width)} x ${formatDimension(box.size.depth)}`
+    : undefined;
+  stack.frames.push({ kind: "box", title: box.label, entries: box.contents, cursor: 0, dimensions });
 }
 
 export function openStatsMenu(stack: MenuStack) {
@@ -97,14 +101,16 @@ export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers,
   const margin = 8;
   const w = view.width - margin * 2;
   const lineH = 10;
-  const titleH = lineH + 4;
   const hintH = lineH + 2;
   const innerW = w - pad * 2;
 
+  const hasDimensions = top.kind === "box" && !!top.dimensions;
+  const titleLines = hasDimensions ? 2 : 1;
+  const titleBlockH = titleLines * lineH + 4;
   const rowCount = rowCountFor(top, handlers);
   const bodyLineCount = top.kind === "note" ? wrapText(top.text, innerW, 6).length : Math.max(1, rowCount);
   const bodyH = bodyLineCount * lineH;
-  const h = pad * 2 + titleH + bodyH + hintH + 4;
+  const h = pad * 2 + titleBlockH + bodyH + hintH + 4;
   const x = margin;
   const y = view.height - h - margin;
 
@@ -118,10 +124,14 @@ export function renderMenu(view: View, stack: MenuStack, handlers: MenuHandlers,
 
   ctx.fillStyle = TEXT;
   drawText(ctx, top.title, x + pad, y + pad);
+  if (hasDimensions && top.kind === "box" && top.dimensions) {
+    ctx.fillStyle = TEXT_DIM;
+    drawText(ctx, top.dimensions, x + pad, y + pad + lineH);
+  }
   ctx.fillStyle = PANEL_BORDER_INNER;
-  ctx.fillRect(x + pad, y + pad + lineH + 1, innerW, 1);
+  ctx.fillRect(x + pad, y + pad + titleLines * lineH + 1, innerW, 1);
 
-  const bodyY = y + pad + titleH;
+  const bodyY = y + pad + titleBlockH;
 
   if (top.kind === "note") {
     ctx.fillStyle = TEXT;
