@@ -1,5 +1,7 @@
 import type { View } from "./canvas";
 import type { Player } from "../world/player";
+import type { Room } from "../world/room";
+import { formatDimension } from "../world/measure";
 import { getEffect } from "../world/effect";
 import { drawText, textWidth } from "../ui/menu";
 import { drawEffectIcon, ICON_SIZE } from "./effectIcons";
@@ -43,4 +45,19 @@ export function renderEffectHUD(view: View, player: Player) {
 
     x = bx - BADGE_PAD * 2 - 2;
   }
+}
+
+/** Top-left room name badge. Shows real-world size (e.g. `16'0" SQ`) for
+ * rooms generated from `size` — see src/world/measure.ts and room.ts. */
+export function renderRoomLabel(view: View, room: Room) {
+  const { ctx } = view;
+  const label = room.realSize ? `${room.name} ${formatDimension(room.realSize)} SQ` : room.name;
+  const w = textWidth(label);
+  const x = HUD_MARGIN;
+  const y = HUD_MARGIN;
+
+  ctx.fillStyle = "rgba(26, 20, 32, 0.8)";
+  ctx.fillRect(x - BADGE_PAD, y - 1, w + BADGE_PAD * 2, 8);
+  ctx.fillStyle = "#e8d8b0";
+  drawText(ctx, label, x, y);
 }
