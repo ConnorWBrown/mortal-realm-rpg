@@ -1,10 +1,32 @@
 {
   "id": "bookshelf",
   "label": "Bookshelf",
-  "sprite": { "col": 3, "row": 7 },
+  "sprite": {
+    "col": 3,
+    "row": 7
+  },
+  "size": {
+    "width": {
+      "feet": 6,
+      "inches": 0
+    },
+    "depth": {
+      "feet": 1,
+      "inches": 0
+    }
+  },
   "contents": [
-    { "type": "box", "boxId": "bookshelf-fiction" },
-    { "type": "box", "boxId": "bookshelf-nonfiction" },
-    { "type": "item", "label": "Framed photo" }
+    {
+      "type": "box",
+      "boxId": "bookshelf-fiction"
+    },
+    {
+      "type": "box",
+      "boxId": "bookshelf-nonfiction"
+    },
+    {
+      "type": "item",
+      "label": "Framed photo"
+    }
   ]
 }
