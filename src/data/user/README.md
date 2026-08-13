@@ -34,11 +34,25 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
   no multi-room navigation yet), so to change what you actually see, your
   room's `id` must be `"office"`.
 - `name` — display name.
-- `legend` — maps single characters used in `grid` to a tile kind: one of
-  `"floor"`, `"wall"`, `"door"`.
-- `grid` — array of equal-length strings, one per row, using only characters
-  defined in `legend`.
-- `spawn` — `{ "x": number, "y": number }`, must land on a floor tile.
+- A room's layout comes from **either** `size` **or** `grid`/`legend` — pick one:
+  - `size` — `{ "feet": number, "inches": number }`, the real-world side
+    length of a square room. The game generates a square layout for you:
+    perimeter walls, floor inside, one door. Each grid block is an
+    approximation of `FEET_PER_BLOCK` (3) real-world feet, rounded **up** —
+    so a 16'0" wall becomes `ceil(16*12 / 36) = 6` blocks. See
+    `src/world/measure.ts` for the conversion and `src/world/room.ts` for
+    the generator. Only square rooms are supported this way for now.
+  - `doorSide` — optional, one of `"top"`, `"bottom"`, `"left"`, `"right"`
+    (default `"bottom"`). Only used with `size`; picks which wall the door
+    sits in the middle of.
+  - `legend` — maps single characters used in `grid` to a tile kind: one of
+    `"floor"`, `"wall"`, `"door"`. Required if you hand-author `grid`.
+  - `grid` — array of equal-length strings, one per row, using only
+    characters defined in `legend`. Use this instead of `size` when you want
+    a hand-drawn, non-square, or irregular layout.
+- `spawn` — `{ "x": number, "y": number }`, must land on a floor tile. For a
+  `size`-generated room, floor tiles are every cell except the outer border,
+  i.e. `x` and `y` in `[1, blocks - 2]`.
 - `boxes` — array of `{ "x": number, "y": number, "boxId": string }` placing a
   box (see below) on a floor tile. `boxId` must reference a real box id
   (default or user-defined) or the game will fail to load.
