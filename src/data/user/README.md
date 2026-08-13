@@ -36,12 +36,15 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
 - `name` — display name.
 - A room's layout comes from **either** `size` **or** `grid`/`legend` — pick one:
   - `size` — `{ "feet": number, "inches": number }`, the real-world side
-    length of a square room. The game generates a square layout for you:
-    perimeter walls, floor inside, one door. Each grid block is an
-    approximation of `FEET_PER_BLOCK` (3) real-world feet, rounded **up** —
-    so a 16'0" wall becomes `ceil(16*12 / 36) = 6` blocks. See
-    `src/world/measure.ts` for the conversion and `src/world/room.ts` for
-    the generator. Only square rooms are supported this way for now.
+    length of the room's **interior** (floor area — walls are added on top,
+    not counted in this measurement). The game generates a square layout for
+    you: a one-block wall ring around a floor of `blocksForDimension(size)`
+    blocks per side, plus one door. Each block is an approximation of
+    `FEET_PER_BLOCK` (3) real-world feet, rounded **up** — so a 16'0" interior
+    becomes `ceil(16*12 / 36) = 6` floor blocks, plus a wall block on each
+    side, 8 blocks total. See `src/world/measure.ts` for the conversion and
+    `src/world/room.ts` for the generator. Only square rooms are supported
+    this way for now.
   - `doorSide` — optional, one of `"top"`, `"bottom"`, `"left"`, `"right"`
     (default `"bottom"`). Only used with `size`; picks which wall the door
     sits in the middle of.
@@ -51,8 +54,9 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
     characters defined in `legend`. Use this instead of `size` when you want
     a hand-drawn, non-square, or irregular layout.
 - `spawn` — `{ "x": number, "y": number }`, must land on a floor tile. For a
-  `size`-generated room, floor tiles are every cell except the outer border,
-  i.e. `x` and `y` in `[1, blocks - 2]`.
+  `size`-generated room, floor tiles are the inner `blocksForDimension(size)`
+  square, i.e. `x` and `y` in `[1, blocksForDimension(size)]` (index 0 and
+  the last index are the wall ring).
 - `boxes` — array of `{ "x": number, "y": number, "boxId": string }` placing a
   box (see below) on a floor tile. `boxId` must reference a real box id
   (default or user-defined) or the game will fail to load.

@@ -26,11 +26,14 @@ interface RoomJson {
   id: string;
   name: string;
   /**
-   * Real-world side length of a square room, in feet + inches. When present,
+   * Real-world side length of the square room's INTERIOR (floor area only —
+   * walls are added on top of this, not counted in it). When present,
    * `grid`/`legend` are ignored (and may be omitted): a square room is
-   * generated automatically — perimeter walls, floor inside, one door — with
-   * each grid block approximating FEET_PER_BLOCK feet of real space, rounded
-   * up. See src/world/measure.ts.
+   * generated automatically. The interior is `blocksForDimension(size)`
+   * floor blocks per side (each block approximating FEET_PER_BLOCK feet,
+   * rounded up), surrounded by a one-block-thick wall — so a 16'0" room is
+   * 6 floor blocks plus a wall block on each side, 8 blocks total. See
+   * src/world/measure.ts.
    */
   size?: Dimension;
   /** Which perimeter wall gets the door for a `size`-generated room. Default "bottom". */
@@ -42,9 +45,12 @@ interface RoomJson {
 }
 
 function generateSquareRoom(
-  blocks: number,
+  interiorBlocks: number,
   doorSide: DoorSide,
 ): { legend: Record<string, TileKind>; grid: string[] } {
+  // The measured size is the interior (floor) footprint; a one-block wall
+  // ring goes around it, so a 16'0" / 6-block interior is 8 blocks total.
+  const blocks = interiorBlocks + 2;
   const legend: Record<string, TileKind> = { "#": "wall", ".": "floor", D: "door" };
   const mid = Math.floor(blocks / 2);
   const grid: string[] = [];
@@ -70,13 +76,8 @@ function parseRoom(data: RoomJson): Room {
   let realSize: Dimension | undefined;
 
   if (data.size) {
-    const blocks = blocksForDimension(data.size);
-    if (blocks < 3) {
-      throw new Error(
-        `Room ${data.id}: size ${data.size.feet}'${data.size.inches}" is too small to fit walls + floor (${blocks} block(s))`,
-      );
-    }
-    const generated = generateSquareRoom(blocks, data.doorSide ?? "bottom");
+    const interiorBlocks = blocksForDimension(data.size);
+    const generated = generateSquareRoom(interiorBlocks, data.doorSide ?? "bottom");
     legend = generated.legend;
     grid = generated.grid;
     realSize = data.size;
