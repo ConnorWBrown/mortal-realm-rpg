@@ -1,6 +1,8 @@
 import { getBox, type Box } from "./box";
+import { blocksForDimension, type Dimension } from "./measure";
 
 export type TileKind = "floor" | "wall" | "door";
+export type DoorSide = "top" | "bottom" | "left" | "right";
 
 export interface BoxPlacement {
   x: number;
@@ -16,30 +18,86 @@ export interface Room {
   tiles: TileKind[][];
   spawn: { x: number; y: number };
   boxes: BoxPlacement[];
+  /** Real-world side length this room was generated from, if any. See `size` below. */
+  realSize?: Dimension;
 }
 
 interface RoomJson {
   id: string;
   name: string;
-  legend: Record<string, TileKind>;
-  grid: string[];
+  /**
+   * Real-world side length of a square room, in feet + inches. When present,
+   * `grid`/`legend` are ignored (and may be omitted): a square room is
+   * generated automatically — perimeter walls, floor inside, one door — with
+   * each grid block approximating FEET_PER_BLOCK feet of real space, rounded
+   * up. See src/world/measure.ts.
+   */
+  size?: Dimension;
+  /** Which perimeter wall gets the door for a `size`-generated room. Default "bottom". */
+  doorSide?: DoorSide;
+  legend?: Record<string, TileKind>;
+  grid?: string[];
   spawn: { x: number; y: number };
   boxes?: BoxPlacement[];
 }
 
+function generateSquareRoom(
+  blocks: number,
+  doorSide: DoorSide,
+): { legend: Record<string, TileKind>; grid: string[] } {
+  const legend: Record<string, TileKind> = { "#": "wall", ".": "floor", D: "door" };
+  const mid = Math.floor(blocks / 2);
+  const grid: string[] = [];
+  for (let y = 0; y < blocks; y++) {
+    let row = "";
+    for (let x = 0; x < blocks; x++) {
+      const border = x === 0 || y === 0 || x === blocks - 1 || y === blocks - 1;
+      const isDoor =
+        (doorSide === "top" && y === 0 && x === mid) ||
+        (doorSide === "bottom" && y === blocks - 1 && x === mid) ||
+        (doorSide === "left" && x === 0 && y === mid) ||
+        (doorSide === "right" && x === blocks - 1 && y === mid);
+      row += isDoor ? "D" : border ? "#" : ".";
+    }
+    grid.push(row);
+  }
+  return { legend, grid };
+}
+
 function parseRoom(data: RoomJson): Room {
-  const height = data.grid.length;
-  const width = data.grid[0]?.length ?? 0;
+  let legend = data.legend;
+  let grid = data.grid;
+  let realSize: Dimension | undefined;
+
+  if (data.size) {
+    const blocks = blocksForDimension(data.size);
+    if (blocks < 3) {
+      throw new Error(
+        `Room ${data.id}: size ${data.size.feet}'${data.size.inches}" is too small to fit walls + floor (${blocks} block(s))`,
+      );
+    }
+    const generated = generateSquareRoom(blocks, data.doorSide ?? "bottom");
+    legend = generated.legend;
+    grid = generated.grid;
+    realSize = data.size;
+  }
+
+  if (!grid || !legend) {
+    throw new Error(`Room ${data.id}: must specify either 'size' or both 'grid' and 'legend'`);
+  }
+
+  const height = grid.length;
+  const width = grid[0]?.length ?? 0;
   const tiles: TileKind[][] = [];
   for (let y = 0; y < height; y++) {
-    const row = data.grid[y];
+    const row = grid[y];
     if (row.length !== width) {
       throw new Error(`Room ${data.id} row ${y} has length ${row.length}, expected ${width}`);
     }
     const line: TileKind[] = [];
     for (let x = 0; x < width; x++) {
       const ch = row[x];
-      const kind = data.legend[ch];
+      const kind = legend[ch];
       if (!kind) throw new Error(`Room ${data.id}: unknown tile '${ch}' at (${x},${y})`);
       line.push(kind);
     }
@@ -60,6 +118,7 @@ function parseRoom(data: RoomJson): Room {
     tiles,
     spawn: data.spawn,
     boxes: placements,
+    realSize,
   };
 }
 
