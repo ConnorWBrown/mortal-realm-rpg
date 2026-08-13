@@ -1,4 +1,3 @@
-import officeData from "../data/rooms/office.json";
 import { getBox, type Box } from "./box";
 
 export type TileKind = "floor" | "wall" | "door";
@@ -79,6 +78,22 @@ export function resolveBox(p: BoxPlacement): Box {
   return getBox(p.boxId);
 }
 
-export const rooms: Record<string, Room> = {
-  office: parseRoom(officeData as RoomJson),
-};
+const roomModules = import.meta.glob<RoomJson>("../data/rooms/*.json", {
+  eager: true,
+  import: "default",
+});
+
+// User-local overrides/additions, gitignored — see src/data/user/README.md.
+// Files here win over default rooms with the same id.
+const userRoomModules = import.meta.glob<RoomJson>("../data/user/rooms/*.json", {
+  eager: true,
+  import: "default",
+});
+
+const rawRooms: Record<string, RoomJson> = {};
+for (const r of Object.values(roomModules)) rawRooms[r.id] = r;
+for (const r of Object.values(userRoomModules)) rawRooms[r.id] = r;
+
+export const rooms: Record<string, Room> = Object.fromEntries(
+  Object.entries(rawRooms).map(([id, data]) => [id, parseRoom(data)]),
+);

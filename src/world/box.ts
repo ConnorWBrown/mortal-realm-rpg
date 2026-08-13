@@ -19,9 +19,16 @@ const boxModules = import.meta.glob<BoxJson>("../data/boxes/*.json", {
   import: "default",
 });
 
-export const boxes: Record<string, Box> = Object.fromEntries(
-  Object.values(boxModules).map((b) => [b.id, b]),
-);
+// User-local overrides/additions, gitignored — see src/data/user/README.md.
+// Files here win over default boxes with the same id.
+const userBoxModules = import.meta.glob<BoxJson>("../data/user/boxes/*.json", {
+  eager: true,
+  import: "default",
+});
+
+export const boxes: Record<string, Box> = {};
+for (const b of Object.values(boxModules)) boxes[b.id] = b;
+for (const b of Object.values(userBoxModules)) boxes[b.id] = b;
 
 for (const b of Object.values(boxes)) {
   for (const entry of b.contents) {

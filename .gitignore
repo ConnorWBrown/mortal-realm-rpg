@@ -4,3 +4,7 @@ dev-dist
 .DS_Store
 *.log
 .claude/
+
+# Personal room/box overrides — see src/data/user/README.md
+src/data/user/*
+!src/data/user/README.md
