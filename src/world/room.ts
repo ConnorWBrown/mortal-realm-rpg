@@ -379,10 +379,10 @@ function findDoorTileLocal(room: Room): { x: number; y: number } | null {
 }
 
 const INWARD_FROM_WALL: Record<DoorSide, { dx: number; dy: number }> = {
-  top: { dx: 0, dy: 1 },
-  bottom: { dx: 0, dy: -1 },
-  left: { dx: 1, dy: 0 },
-  right: { dx: -1, dy: 0 },
+  top: { dx: 0, dy: 0 },
+  bottom: { dx: 0, dy: 0 },
+  left: { dx: 0, dy: 0 },
+  right: { dx: 0, dy: 0 },
 };
 
 /**
