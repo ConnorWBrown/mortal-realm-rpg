@@ -1,0 +1,54 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+Mortal Realm — a personal, single-player retro RPG for life organization (quests = projects/tasks, potions = mood/state effects, boxes = furniture you open to see items/notes). Built with Vite + TypeScript + Canvas 2D, shipped as a PWA to GitHub Pages. All game content (rooms, boxes, effects, quests) is authored as JSON, not code.
+
+## Commands
+
+- `npm run dev` — start the Vite dev server (default port 5173).
+- `npm run build` — type-check (`tsc`, no emit) then production build via Vite.
+- `npm run preview` — serve the production build locally.
+
+There is no test suite and no lint/format tooling configured — `npm run build`'s `tsc` step (strict mode) is the only automated check. There is no single-test-file command.
+
+Deploys to GitHub Pages automatically on push to `main` via `.github/workflows/deploy.yml` (`npm ci && npm run build`, publishes `dist`). Vite's `base` is hardcoded to `/mortal-realm-rpg/` in `vite.config.ts`.
+
+## Architecture
+
+### Data-driven content, loaded via `import.meta.glob`
+
+Every content type (rooms, boxes, effects, quests) lives as JSON under `src/data/<type>/` and is eagerly globbed at build time in the corresponding `src/world/*.ts` module (e.g. `src/world/room.ts` globs `src/data/rooms/*.json`). A bad reference (missing box id, unknown tile char, out-of-bounds placement) throws at load time and the app won't boot — check the browser console.
+
+**User-local overrides**: `src/data/user/{rooms,boxes}/` is gitignored (see `src/data/user/README.md`) and also globbed; entries there replace default rooms/boxes with the same `id` entirely (no field-level merge). Effects and quests are not user-overridable this way. Note the game currently only ever loads the room with id `"office"` — there's no multi-room navigation yet, despite `doorTo`/`worldOrigin` plumbing existing for it.
+
+### Real-world measurement system (`src/world/measure.ts`)
+
+Rooms and boxes are authored in feet/inches (`Dimension = {feet, inches}`), not grid blocks. `FEET_PER_BLOCK = 3`. Two rounding rules are used **deliberately** and must not be conflated:
+- Room/wall sizes round **up** (`blocksForDimension`) so a generated room is never smaller than reality.
+- Object footprints round **down**, minimum 1 block (`blocksForDimensionFloor`), so objects are less likely to visually overflow their rounded blocks.
+
+Because of this, block counts alone can't prove a placement is valid. `src/world/room.ts`'s `resolvePlacements` computes true (inch-precision) rectangles for every box, validates fit/overlap against those, and only *then* derives the clamped block rectangle used for rendering/collision — violations are logged as `console.warn` but never thrown; the room still loads with the approximate layout.
+
+A room's layout comes from either `size` (auto-generates a square room: one-block wall ring + door) or a hand-authored `grid`/`legend` pair — see field docs in `src/world/room.ts` and the schema writeup in `src/data/user/README.md`.
+
+### Boxes, contents, and potions
+
+`src/world/box.ts` defines `Box` (with optional `sprite`, optional `size` — only boxes placed directly in a room need `size`) and `BoxEntry` (`item` | `note` | `box` | `potion`). Boxes can nest other boxes (e.g. drawers) via `{ type: "box", boxId }`. A `potion` entry references an `effectId` from `src/data/effects/*.json` (`src/world/effect.ts`); effects have a `kind` (`mode`/`mood`/`queued`/`need`/`buff`) and an optional `mutex` group — applying an effect in an active mutex group replaces others in that group, `queued`-kind effects stack instead of toggling.
+
+### Quests
+
+`src/world/quest.ts`: quests are seeded from `src/data/quests/*.json` on first boot and thereafter live entirely in player state (`localStorage`, `src/world/persist.ts`, key `mortal-realm:player:v1`). `mergeWithSeeds` adds any newly-introduced seed quests without touching existing player data; a reserved `id: "default"` quest always exists and holds ad-hoc tasks typed into the top-left "Now" input.
+
+### Game loop and rendering
+
+`src/game/loop.ts`'s `createGame` wires everything together: input (`src/game/input.ts`) → world state (`src/world/*`) → rendering (`src/render/*`) → UI overlays (`src/ui/*`), driven by a single `requestAnimationFrame` tick that calls `update(dt)` then `render()`. Movement is grid-based with a fixed `MOVE_DURATION_MS` tween between tiles; walking onto a `door` tile teleports the player to the linked room's entry point (`doorTo`/`entryPointForRoom`) rather than actually moving there. Player state is persisted to `localStorage` on most mutations (movement completion, quest edits, effect changes, "Now" edits).
+
+Rendering is layered per frame in `render()`: clear → room tiles → boxes → player → effect HUD → room label → sidebar (quests/inventory/effects tabs, `src/ui/sidebar.ts`) → modal menu stack (`src/ui/menu.ts`, used for box contents/potion application). Sprites come from Kenney tilesets under `public/assets/`, loaded async by `src/render/assets.ts`; rendering must tolerate `assets` being `null` before load completes.
+
+## Dev tools
+
+- `public/tile-picker.html` (served at `/tile-picker.html`) — visual grid-overlay inspector for the tileset PNGs, used to hand-pick `(col, row)` sprite coordinates for boxes.
+- `public/compare.html` — side-by-side iframe diff of two dev servers (e.g. two branches/worktrees) for visual comparison. Setup steps are in `DEV.md`.

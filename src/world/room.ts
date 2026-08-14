@@ -26,6 +26,17 @@ export interface Room {
   boxes: BoxPlacement[];
   /** Real-world side length this room was generated from, if any. See `size` below. */
   realSize?: Dimension;
+  /**
+   * This room's top-left corner in world-space blocks. Rooms are laid out
+   * side by side in one shared coordinate space (with gaps of unwalkable
+   * void between them) purely so doors can "teleport" the player between
+   * rooms that are otherwise drawn as disconnected — see `doorTo` below.
+   */
+  worldOrigin: { x: number; y: number };
+  /** Which wall this room's door sits on. Defaults to "bottom". */
+  doorSide?: DoorSide;
+  /** Room id this room's door leads to, if any. */
+  doorTo?: string;
 }
 
 /**
@@ -61,6 +72,10 @@ interface RoomJson {
   size?: Dimension;
   /** Which perimeter wall gets the door for a `size`-generated room. Default "bottom". */
   doorSide?: DoorSide;
+  /** Room id this room's door leads to, if any. */
+  doorTo?: string;
+  /** This room's top-left corner in world-space blocks. Defaults to {0,0}. */
+  worldOrigin?: { x: number; y: number };
   legend?: Record<string, TileKind>;
   grid?: string[];
   spawn: { x: number; y: number };
@@ -267,6 +282,9 @@ function parseRoom(data: RoomJson): Room {
     spawn: data.spawn,
     boxes,
     realSize,
+    worldOrigin: data.worldOrigin ?? { x: 0, y: 0 },
+    doorSide: data.doorSide,
+    doorTo: data.doorTo,
   };
 }
 
@@ -308,3 +326,75 @@ for (const r of Object.values(userRoomModules)) rawRooms[r.id] = r;
 export const rooms: Record<string, Room> = Object.fromEntries(
   Object.entries(rawRooms).map(([id, data]) => [id, parseRoom(data)]),
 );
+
+const allRoomsList: Room[] = Object.values(rooms);
+
+export interface WorldBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** The union of every room's footprint in world-space blocks. Used to clamp the camera. */
+export function worldBounds(): WorldBounds {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const r of allRoomsList) {
+    minX = Math.min(minX, r.worldOrigin.x);
+    minY = Math.min(minY, r.worldOrigin.y);
+    maxX = Math.max(maxX, r.worldOrigin.x + r.width);
+    maxY = Math.max(maxY, r.worldOrigin.y + r.height);
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/** Which room (if any) occupies a world-space block, and the equivalent room-local coords. */
+export function findRoomContainingWorldPoint(
+  wx: number,
+  wy: number,
+): { room: Room; lx: number; ly: number } | null {
+  for (const r of allRoomsList) {
+    const lx = wx - r.worldOrigin.x;
+    const ly = wy - r.worldOrigin.y;
+    if (lx >= 0 && ly >= 0 && lx < r.width && ly < r.height) return { room: r, lx, ly };
+  }
+  return null;
+}
+
+export function isWalkableWorld(wx: number, wy: number): boolean {
+  const hit = findRoomContainingWorldPoint(wx, wy);
+  return hit !== null && isWalkable(hit.room, hit.lx, hit.ly);
+}
+
+function findDoorTileLocal(room: Room): { x: number; y: number } | null {
+  for (let y = 0; y < room.height; y++) {
+    for (let x = 0; x < room.width; x++) {
+      if (room.tiles[y][x] === "door") return { x, y };
+    }
+  }
+  return null;
+}
+
+const INWARD_FROM_WALL: Record<DoorSide, { dx: number; dy: number }> = {
+  top: { dx: 0, dy: 0 },
+  bottom: { dx: 0, dy: 0 },
+  left: { dx: 0, dy: 0 },
+  right: { dx: 0, dy: 0 },
+};
+
+/**
+ * World-space block a player should land on when entering `room` through its
+ * door — the door tile itself, stepped one block inward from its wall.
+ */
+export function entryPointForRoom(room: Room): { x: number; y: number } | null {
+  const doorLocal = findDoorTileLocal(room);
+  if (!doorLocal) return null;
+  const inward = INWARD_FROM_WALL[room.doorSide ?? "bottom"];
+  return {
+    x: room.worldOrigin.x + doorLocal.x + inward.dx,
+    y: room.worldOrigin.y + doorLocal.y + inward.dy,
+  };
+}
