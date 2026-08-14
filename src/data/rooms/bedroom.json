@@ -1,0 +1,10 @@
+{
+  "id": "bedroom",
+  "name": "Bedroom",
+  "size": { "feet": 12, "inches": 0 },
+  "worldOrigin": { "x": 9, "y": 1 },
+  "doorSide": "left",
+  "doorTo": "office",
+  "spawn": { "x": 2, "y": 2 },
+  "boxes": []
+}

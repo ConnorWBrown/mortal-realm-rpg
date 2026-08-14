@@ -3,7 +3,16 @@ import { createView, clear } from "../render/canvas";
 import { BG_COLOR, computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
 import { renderEffectHUD, renderRoomLabel } from "../render/hud";
 import { loadAssets, type Assets } from "../render/assets";
-import { rooms, isWalkable, getBoxAt, resolveBox, type Room } from "../world/room";
+import {
+  rooms,
+  isWalkable,
+  isWalkableWorld,
+  findRoomContainingWorldPoint,
+  entryPointForRoom,
+  worldBounds,
+  getBoxAt,
+  resolveBox,
+} from "../world/room";
 import { createPlayer, isMoving, type Player } from "../world/player";
 import { applyEffect, getEffect, removeEffectAt } from "../world/effect";
 import { applyPersisted, loadPlayer, savePlayer } from "../world/persist";
@@ -48,10 +57,16 @@ export interface Game {
 export function createGame(canvas: HTMLCanvasElement): Game {
   const input = createInput();
   const view = createView(canvas);
-  const room: Room = rooms.office;
-  const player: Player = createPlayer(room.spawn);
+  const roomList = Object.values(rooms);
+  const bounds = worldBounds();
+  const homeRoom = rooms.office;
+  const spawn = {
+    x: homeRoom.worldOrigin.x + homeRoom.spawn.x,
+    y: homeRoom.worldOrigin.y + homeRoom.spawn.y,
+  };
+  const player: Player = createPlayer(spawn);
   const saved = loadPlayer();
-  if (saved && isWalkable(room, saved.x, saved.y)) {
+  if (saved && isWalkableWorld(saved.x, saved.y)) {
     applyPersisted(player, saved);
   }
   // Seed quests (merges any newly-added seed JSON files; always keeps a Default quest).
@@ -145,7 +160,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     }
     if (input.consumePress("a")) {
       const { dx, dy } = DIR_VEC[player.facing];
-      const placement = getBoxAt(room, player.x + dx, player.y + dy);
+      const hit = findRoomContainingWorldPoint(player.x + dx, player.y + dy);
+      const placement = hit ? getBoxAt(hit.room, hit.lx, hit.ly) : null;
       if (placement) {
         openBoxMenu(menus, resolveBox(placement));
         return;
@@ -157,13 +173,30 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     const { dx, dy } = DIR_VEC[dir];
     const tx = player.x + dx;
     const ty = player.y + dy;
-    if (isWalkable(room, tx, ty)) {
-      player.moveFrom = { x: player.x, y: player.y };
-      player.x = tx;
-      player.y = ty;
-      player.moveProgress = 0;
-      moveElapsed = 0;
+    const hit = findRoomContainingWorldPoint(tx, ty);
+    if (!hit || !isWalkable(hit.room, hit.lx, hit.ly)) return;
+
+    // Doors teleport on contact: step onto the tile and land at the linked
+    // room's door instead of actually moving into this one.
+    if (hit.room.tiles[hit.ly][hit.lx] === "door" && hit.room.doorTo) {
+      const target = rooms[hit.room.doorTo];
+      const entry = target ? entryPointForRoom(target) : null;
+      if (entry) {
+        player.x = entry.x;
+        player.y = entry.y;
+        player.moveFrom = { ...entry };
+        player.moveProgress = 1;
+        moveElapsed = 0;
+        savePlayer(player);
+        return;
+      }
     }
+
+    player.moveFrom = { x: player.x, y: player.y };
+    player.x = tx;
+    player.y = ty;
+    player.moveProgress = 0;
+    moveElapsed = 0;
   }
 
   function dispatchSidebarAction(action: ReturnType<typeof sidebarClick> & {}): void {
@@ -206,12 +239,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function render() {
     clear(view, BG_COLOR);
-    const cam = computeCamera(room, player, view);
-    renderRoom(view, room, cam, assets);
-    renderBoxes(view, room, cam, assets);
+    const cam = computeCamera(bounds, player, view);
+    renderRoom(view, roomList, cam, assets);
+    renderBoxes(view, roomList, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    renderRoomLabel(view, room);
+    const currentRoom = findRoomContainingWorldPoint(player.x, player.y)?.room ?? homeRoom;
+    renderRoomLabel(view, currentRoom);
     if (!isMenuOpen(menus)) {
       renderSidebar(
         view,

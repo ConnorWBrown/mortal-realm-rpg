@@ -2,6 +2,9 @@
   "id": "office",
   "name": "Office",
   "size": { "feet": 16, "inches": 0 },
+  "worldOrigin": { "x": 0, "y": 0 },
+  "doorSide": "right",
+  "doorTo": "bedroom",
   "spawn": { "x": 2, "y": 3 },
   "boxes": [
     {

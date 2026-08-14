@@ -1,5 +1,5 @@
 import type { View } from "./canvas";
-import type { Room, TileKind } from "../world/room";
+import type { Room, TileKind, WorldBounds } from "../world/room";
 import type { Player } from "../world/player";
 import { drawTileCoord, type Assets } from "./assets";
 import { getBox } from "../world/box";
@@ -22,31 +22,36 @@ export interface Camera {
   y: number;
 }
 
-export function computeCamera(room: Room, player: Player, view: View): Camera {
+export function computeCamera(bounds: WorldBounds, player: Player, view: View): Camera {
   const px = lerpPx(player.moveFrom.x, player.x, player.moveProgress);
   const py = lerpPx(player.moveFrom.y, player.y, player.moveProgress);
   const halfW = view.width / 2 / TILE_SIZE;
   const halfH = view.height / 2 / TILE_SIZE;
-  const maxCamX = room.width - view.width / TILE_SIZE;
-  const maxCamY = room.height - view.height / TILE_SIZE;
-  const camX = clamp(px + 0.5 - halfW, 0, Math.max(0, maxCamX));
-  const camY = clamp(py + 0.5 - halfH, 0, Math.max(0, maxCamY));
+  const maxCamX = bounds.maxX - view.width / TILE_SIZE;
+  const maxCamY = bounds.maxY - view.height / TILE_SIZE;
+  const camX = clamp(px + 0.5 - halfW, bounds.minX, Math.max(bounds.minX, maxCamX));
+  const camY = clamp(py + 0.5 - halfH, bounds.minY, Math.max(bounds.minY, maxCamY));
   return { x: camX * TILE_SIZE, y: camY * TILE_SIZE };
 }
 
-export function renderRoom(view: View, room: Room, cam: Camera, assets: Assets | null) {
+/** Rooms are drawn independently at their `worldOrigin` — the gap between them is
+ * simply never painted, so two adjacent rooms read as disconnected blocks. */
+export function renderRoom(view: View, rooms: Room[], cam: Camera, assets: Assets | null) {
   const { ctx } = view;
-  const startX = Math.max(0, Math.floor(cam.x / TILE_SIZE));
-  const startY = Math.max(0, Math.floor(cam.y / TILE_SIZE));
-  const endX = Math.min(room.width, Math.ceil((cam.x + view.width) / TILE_SIZE));
-  const endY = Math.min(room.height, Math.ceil((cam.y + view.height) / TILE_SIZE));
+  for (const room of rooms) {
+    const { x: ox, y: oy } = room.worldOrigin;
+    const startX = Math.max(0, Math.floor(cam.x / TILE_SIZE - ox));
+    const startY = Math.max(0, Math.floor(cam.y / TILE_SIZE - oy));
+    const endX = Math.min(room.width, Math.ceil((cam.x + view.width) / TILE_SIZE - ox));
+    const endY = Math.min(room.height, Math.ceil((cam.y + view.height) / TILE_SIZE - oy));
 
-  for (let y = startY; y < endY; y++) {
-    for (let x = startX; x < endX; x++) {
-      const kind = room.tiles[y][x];
-      const sx = x * TILE_SIZE - cam.x;
-      const sy = y * TILE_SIZE - cam.y;
-      drawTileKind(ctx, kind, sx, sy, assets);
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        const kind = room.tiles[y][x];
+        const sx = (x + ox) * TILE_SIZE - cam.x;
+        const sy = (y + oy) * TILE_SIZE - cam.y;
+        drawTileKind(ctx, kind, sx, sy, assets);
+      }
     }
   }
 }
@@ -75,22 +80,25 @@ function drawTileKind(
   }
 }
 
-export function renderBoxes(view: View, room: Room, cam: Camera, assets: Assets | null) {
+export function renderBoxes(view: View, rooms: Room[], cam: Camera, assets: Assets | null) {
   const { ctx } = view;
-  for (const p of room.boxes) {
-    const box = getBox(p.boxId);
-    // Multi-block footprints don't have bespoke art yet, so tile the single
-    // sprite/fallback across every cell — same approach as wall tiling.
-    for (let dy = 0; dy < p.depthBlocks; dy++) {
-      for (let dx = 0; dx < p.widthBlocks; dx++) {
-        const sx = (p.x + dx) * TILE_SIZE - cam.x;
-        const sy = (p.y + dy) * TILE_SIZE - cam.y;
-        if (sx + TILE_SIZE < 0 || sy + TILE_SIZE < 0 || sx > view.width || sy > view.height) continue;
-        if (assets && box.sprite) {
-          drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, sx, sy);
-        } else {
-          ctx.fillStyle = "#8a5a2a";
-          ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+  for (const room of rooms) {
+    const { x: ox, y: oy } = room.worldOrigin;
+    for (const p of room.boxes) {
+      const box = getBox(p.boxId);
+      // Multi-block footprints don't have bespoke art yet, so tile the single
+      // sprite/fallback across every cell — same approach as wall tiling.
+      for (let dy = 0; dy < p.depthBlocks; dy++) {
+        for (let dx = 0; dx < p.widthBlocks; dx++) {
+          const sx = (p.x + dx + ox) * TILE_SIZE - cam.x;
+          const sy = (p.y + dy + oy) * TILE_SIZE - cam.y;
+          if (sx + TILE_SIZE < 0 || sy + TILE_SIZE < 0 || sx > view.width || sy > view.height) continue;
+          if (assets && box.sprite) {
+            drawTileCoord(ctx, assets.indoor, box.sprite.col, box.sprite.row, sx, sy);
+          } else {
+            ctx.fillStyle = "#8a5a2a";
+            ctx.fillRect(sx + 2, sy + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+          }
         }
       }
     }
