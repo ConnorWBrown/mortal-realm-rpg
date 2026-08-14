@@ -1,7 +1,7 @@
 import { createInput, type Direction, type InputState } from "./input";
 import { createView, clear } from "../render/canvas";
 import { BG_COLOR, computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
-import { renderEffectHUD, renderRoomLabel } from "../render/hud";
+import { renderEffectHUD, renderRoomLabels } from "../render/hud";
 import { loadAssets, type Assets } from "../render/assets";
 import {
   rooms,
@@ -244,8 +244,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     renderBoxes(view, roomList, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    const currentRoom = findRoomContainingWorldPoint(player.x, player.y)?.room ?? homeRoom;
-    renderRoomLabel(view, currentRoom);
+    renderRoomLabels(view, roomList, cam);
     if (!isMenuOpen(menus)) {
       renderSidebar(
         view,

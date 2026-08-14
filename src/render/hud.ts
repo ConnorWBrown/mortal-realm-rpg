@@ -1,6 +1,8 @@
 import type { View } from "./canvas";
 import type { Player } from "../world/player";
 import type { Room } from "../world/room";
+import type { Camera } from "./tiles";
+import { TILE_SIZE } from "./tiles";
 import { formatDimension } from "../world/measure";
 import { getEffect } from "../world/effect";
 import { drawText, textWidth } from "../ui/menu";
@@ -47,17 +49,22 @@ export function renderEffectHUD(view: View, player: Player) {
   }
 }
 
-/** Top-left room name badge. Shows real-world size (e.g. `16'0" SQ`) for
- * rooms generated from `size` — see src/world/measure.ts and room.ts. */
-export function renderRoomLabel(view: View, room: Room) {
+/** Nameplate badge drawn inside a room's own top-left corner, in world space,
+ * so it pans/scrolls with that room rather than following the player.
+ * Shows real-world size (e.g. `16'0" SQ`) for rooms generated from `size` —
+ * see src/world/measure.ts and room.ts. */
+export function renderRoomLabels(view: View, rooms: Room[], cam: Camera) {
   const { ctx } = view;
-  const label = room.realSize ? `${room.name} ${formatDimension(room.realSize)} SQ` : room.name;
-  const w = textWidth(label);
-  const x = HUD_MARGIN;
-  const y = HUD_MARGIN;
+  for (const room of rooms) {
+    const label = room.realSize ? `${room.name} ${formatDimension(room.realSize)} SQ` : room.name;
+    const w = textWidth(label);
+    const x = room.worldOrigin.x * TILE_SIZE - cam.x + HUD_MARGIN;
+    const y = room.worldOrigin.y * TILE_SIZE - cam.y + HUD_MARGIN;
+    if (x + w < 0 || y < 0 || x > view.width || y > view.height) continue;
 
-  ctx.fillStyle = "rgba(26, 20, 32, 0.8)";
-  ctx.fillRect(x - BADGE_PAD, y - 1, w + BADGE_PAD * 2, 8);
-  ctx.fillStyle = "#e8d8b0";
-  drawText(ctx, label, x, y);
+    ctx.fillStyle = "rgba(26, 20, 32, 0.8)";
+    ctx.fillRect(x - BADGE_PAD, y - 1, w + BADGE_PAD * 2, 8);
+    ctx.fillStyle = "#e8d8b0";
+    drawText(ctx, label, x, y);
+  }
 }
