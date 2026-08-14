@@ -23,10 +23,6 @@
     {
       "type": "box",
       "boxId": "bookshelf-nonfiction"
-    },
-    {
-      "type": "item",
-      "label": "Framed photo"
     }
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "id": "eugene-hallway",
+  "name": "Hallway",
+  "worldOrigin": { "x": 0, "y": 15 },
+  "legend": { "#": "wall", ".": "floor", "D": "door" },
+  "grid": [
+    "##D#D#D##",
+    "#.......#",
+    "#.......#",
+    "#.......#",
+    "##D#D#D##"
+  ],
+  "spawn": { "x": 1, "y": 2 },
+  "doors": [
+    { "id": "toBathroom", "x": 2, "y": 0, "to": { "room": "eugene-bathroom", "door": "toHallway" } },
+    { "id": "toConnorsOffice", "x": 4, "y": 0, "to": { "room": "eugene-connors-office", "door": "toHallway" } },
+    { "id": "toLucysOffice", "x": 6, "y": 0, "to": { "room": "eugene-lucys-office", "door": "toHallway" } },
+    { "id": "toLivingroom", "x": 2, "y": 4, "to": { "room": "eugene-livingroom", "door": "toHallway" } },
+    { "id": "toBedroom", "x": 4, "y": 4, "to": { "room": "eugene-bedroom", "door": "toHallway" } },
+    { "id": "backDoor", "x": 6, "y": 4 }
+  ]
+}

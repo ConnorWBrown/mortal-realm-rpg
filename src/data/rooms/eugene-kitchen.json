@@ -1,0 +1,19 @@
+{
+  "id": "eugene-kitchen",
+  "name": "Kitchen",
+  "worldOrigin": { "x": 0, "y": 30 },
+  "legend": { "#": "wall", ".": "floor", "D": "door" },
+  "grid": [
+    "###D###",
+    "#.....#",
+    "D.....#",
+    "#.....#",
+    "###D###"
+  ],
+  "spawn": { "x": 3, "y": 2 },
+  "doors": [
+    { "id": "toSunroom", "x": 3, "y": 0, "to": { "room": "eugene-sunroom", "door": "toKitchen" } },
+    { "id": "toLivingroom", "x": 0, "y": 2, "to": { "room": "eugene-livingroom", "door": "toKitchen" } },
+    { "id": "toGarage", "x": 3, "y": 4, "to": { "room": "eugene-garage", "door": "toKitchen" } }
+  ]
+}

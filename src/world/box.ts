@@ -29,6 +29,17 @@ export interface Box {
 
 interface BoxJson extends Box {}
 
+/**
+ * A gitignored, per-box addendum: appends `contents` entries (items/notes/
+ * potions) to a tracked box without touching its structure. Lets a box's
+ * shell (id/sprite/size/nested sub-boxes) live in tracked data while its
+ * personal contents stay local-only — see src/data/user/README.md.
+ */
+interface BoxContentsOverlayJson {
+  boxId: string;
+  contents: BoxEntry[];
+}
+
 const boxModules = import.meta.glob<BoxJson>("../data/boxes/*.json", {
   eager: true,
   import: "default",
@@ -41,9 +52,22 @@ const userBoxModules = import.meta.glob<BoxJson>("../data/user/boxes/*.json", {
   import: "default",
 });
 
+const boxContentsOverlayModules = import.meta.glob<BoxContentsOverlayJson>(
+  "../data/user/box-contents/*.json",
+  { eager: true, import: "default" },
+);
+
 export const boxes: Record<string, Box> = {};
 for (const b of Object.values(boxModules)) boxes[b.id] = b;
 for (const b of Object.values(userBoxModules)) boxes[b.id] = b;
+
+for (const overlay of Object.values(boxContentsOverlayModules)) {
+  const box = boxes[overlay.boxId];
+  if (!box) {
+    throw new Error(`box-contents overlay references unknown box '${overlay.boxId}'`);
+  }
+  box.contents = [...box.contents, ...overlay.contents];
+}
 
 for (const b of Object.values(boxes)) {
   for (const entry of b.contents) {

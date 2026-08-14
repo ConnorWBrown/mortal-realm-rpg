@@ -1,0 +1,10 @@
+{
+  "id": "eugene-sunroom",
+  "name": "Sunroom",
+  "size": { "feet": 10, "inches": 0 },
+  "worldOrigin": { "x": 15, "y": 30 },
+  "spawn": { "x": 2, "y": 2 },
+  "doors": [
+    { "id": "toKitchen", "side": "bottom", "to": { "room": "eugene-kitchen", "door": "toSunroom" } }
+  ]
+}

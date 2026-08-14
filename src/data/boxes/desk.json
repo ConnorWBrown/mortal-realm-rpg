@@ -17,49 +17,8 @@
   },
   "contents": [
     {
-      "type": "item",
-      "label": "Laptop (14\" MBP)"
-    },
-    {
-      "type": "item",
-      "label": "External monitor"
-    },
-    {
-      "type": "item",
-      "label": "Mechanical keyboard"
-    },
-    {
-      "type": "item",
-      "label": "Notebook + pens"
-    },
-    {
-      "type": "potion",
-      "effectId": "heads-down",
-      "label": "Sit down and focus"
-    },
-    {
-      "type": "potion",
-      "effectId": "big-project-energy",
-      "label": "Crack knuckles"
-    },
-    {
-      "type": "potion",
-      "effectId": "task-queued",
-      "label": "Jot a task"
-    },
-    {
-      "type": "potion",
-      "effectId": "spiel-queued",
-      "label": "Park a spiel"
-    },
-    {
       "type": "box",
       "boxId": "desk-drawer"
-    },
-    {
-      "type": "note",
-      "label": "Sticky note",
-      "text": "Remember: batch deep work in the morning."
     }
   ]
 }

@@ -16,6 +16,22 @@ export interface BoxPlacement {
   depthBlocks: number;
 }
 
+/** Where a door leads: a specific door (by id) on a specific other room. */
+export interface DoorTarget {
+  room: string;
+  door: string;
+}
+
+/** A resolved door: a grid position that teleports the player when walked onto. */
+export interface Door {
+  /** Unique within this room; referenced by other rooms' doors as a landing point. */
+  id: string;
+  x: number;
+  y: number;
+  /** Room + door id on the other side. Omitted for a stub door (e.g. an unmodeled exterior exit) that doesn't teleport. */
+  to?: DoorTarget;
+}
+
 export interface Room {
   id: string;
   name: string;
@@ -30,13 +46,17 @@ export interface Room {
    * This room's top-left corner in world-space blocks. Rooms are laid out
    * side by side in one shared coordinate space (with gaps of unwalkable
    * void between them) purely so doors can "teleport" the player between
-   * rooms that are otherwise drawn as disconnected — see `doorTo` below.
+   * rooms that are otherwise drawn as disconnected — see `doors` below.
    */
   worldOrigin: { x: number; y: number };
-  /** Which wall this room's door sits on. Defaults to "bottom". */
-  doorSide?: DoorSide;
-  /** Room id this room's door leads to, if any. */
-  doorTo?: string;
+  /** This room's doors — see `Door`. A room can have any number, including zero. */
+  doors: Door[];
+  /**
+   * Box ids known to be in this room but not yet given a placement (size
+   * and/or exact position). Pure capture for now — not rendered on the grid
+   * or interactable in-game, just validated at load time.
+   */
+  unplaced: string[];
 }
 
 /**
@@ -56,6 +76,21 @@ export interface BoxPlacementJson {
   y: AxisOffsetJson;
 }
 
+/**
+ * A door on a `size`-generated square room: placed at the middle of the
+ * given wall. For hand-authored `grid` rooms, use `x`/`y` instead — the
+ * room's exact layout is already known, so there's no wall to compute a
+ * midpoint from.
+ */
+export interface DoorJson {
+  id: string;
+  side?: DoorSide;
+  x?: number;
+  y?: number;
+  /** Room + door id on the other side. Omit for a stub door that doesn't teleport (e.g. an unmodeled exterior exit). */
+  to?: DoorTarget;
+}
+
 interface RoomJson {
   id: string;
   name: string;
@@ -70,42 +105,68 @@ interface RoomJson {
    * src/world/measure.ts.
    */
   size?: Dimension;
-  /** Which perimeter wall gets the door for a `size`-generated room. Default "bottom". */
-  doorSide?: DoorSide;
-  /** Room id this room's door leads to, if any. */
-  doorTo?: string;
   /** This room's top-left corner in world-space blocks. Defaults to {0,0}. */
   worldOrigin?: { x: number; y: number };
   legend?: Record<string, TileKind>;
   grid?: string[];
   spawn: { x: number; y: number };
   boxes?: BoxPlacementJson[];
+  /** This room's doors — see `DoorJson`. */
+  doors?: DoorJson[];
+  /**
+   * Box ids known to be in this room but not yet given a placement (size
+   * and/or exact position). Pure capture for now — see `Room.unplaced`.
+   */
+  unplaced?: string[];
 }
 
+/**
+ * Places one door per requested side at the middle of that side (throws if
+ * two doors share a side — hand-author a `grid` instead if that's needed).
+ * Returns the grid/legend plus each door's resolved (x, y).
+ */
 function generateSquareRoom(
+  roomId: string,
   interiorBlocks: number,
-  doorSide: DoorSide,
-): { legend: Record<string, TileKind>; grid: string[] } {
+  doorSpecs: { id: string; side: DoorSide }[],
+): { legend: Record<string, TileKind>; grid: string[]; positions: Record<string, { x: number; y: number }> } {
   // The measured size is the interior (floor) footprint; a one-block wall
   // ring goes around it, so a 16'0" / 6-block interior is 8 blocks total.
   const blocks = interiorBlocks + 2;
   const legend: Record<string, TileKind> = { "#": "wall", ".": "floor", D: "door" };
   const mid = Math.floor(blocks / 2);
+
+  const positions: Record<string, { x: number; y: number }> = {};
+  const bySide = new Map<DoorSide, string>();
+  for (const spec of doorSpecs) {
+    if (bySide.has(spec.side)) {
+      throw new Error(
+        `Room ${roomId}: doors '${bySide.get(spec.side)}' and '${spec.id}' both sit on the "${spec.side}" wall — a size-generated room only fits one door per wall (hand-author a 'grid' for more).`,
+      );
+    }
+    bySide.set(spec.side, spec.id);
+    const pos =
+      spec.side === "top"
+        ? { x: mid, y: 0 }
+        : spec.side === "bottom"
+          ? { x: mid, y: blocks - 1 }
+          : spec.side === "left"
+            ? { x: 0, y: mid }
+            : { x: blocks - 1, y: mid };
+    positions[spec.id] = pos;
+  }
+
   const grid: string[] = [];
   for (let y = 0; y < blocks; y++) {
     let row = "";
     for (let x = 0; x < blocks; x++) {
       const border = x === 0 || y === 0 || x === blocks - 1 || y === blocks - 1;
-      const isDoor =
-        (doorSide === "top" && y === 0 && x === mid) ||
-        (doorSide === "bottom" && y === blocks - 1 && x === mid) ||
-        (doorSide === "left" && x === 0 && y === mid) ||
-        (doorSide === "right" && x === blocks - 1 && y === mid);
+      const isDoor = doorSpecs.some((s) => positions[s.id].x === x && positions[s.id].y === y);
       row += isDoor ? "D" : border ? "#" : ".";
     }
     grid.push(row);
   }
-  return { legend, grid };
+  return { legend, grid, positions };
 }
 
 interface ResolvedFootprint {
@@ -240,12 +301,24 @@ function parseRoom(data: RoomJson): Room {
   let legend = data.legend;
   let grid = data.grid;
   let realSize: Dimension | undefined;
+  const doorsJson = data.doors ?? [];
+  let sizeGeneratedPositions: Record<string, { x: number; y: number }> = {};
 
   if (data.size) {
     const interiorBlocks = blocksForDimension(data.size);
-    const generated = generateSquareRoom(interiorBlocks, data.doorSide ?? "bottom");
+    for (const d of doorsJson) {
+      if (!d.side) {
+        throw new Error(`Room ${data.id}: door '${d.id}' needs a 'side' (size-generated rooms can't take explicit x/y)`);
+      }
+    }
+    const generated = generateSquareRoom(
+      data.id,
+      interiorBlocks,
+      doorsJson.map((d) => ({ id: d.id, side: d.side as DoorSide })),
+    );
     legend = generated.legend;
     grid = generated.grid;
+    sizeGeneratedPositions = generated.positions;
     realSize = data.size;
   }
 
@@ -271,7 +344,29 @@ function parseRoom(data: RoomJson): Room {
     tiles.push(line);
   }
 
+  const seenDoorIds = new Set<string>();
+  const doors: Door[] = doorsJson.map((d) => {
+    if (seenDoorIds.has(d.id)) {
+      throw new Error(`Room ${data.id}: duplicate door id '${d.id}'`);
+    }
+    seenDoorIds.add(d.id);
+
+    const pos = data.size ? sizeGeneratedPositions[d.id] : { x: d.x, y: d.y };
+    if (pos.x === undefined || pos.y === undefined) {
+      throw new Error(`Room ${data.id}: door '${d.id}' needs explicit 'x'/'y' (hand-authored 'grid' rooms can't derive a position from 'side')`);
+    }
+    if (pos.x < 0 || pos.y < 0 || pos.x >= width || pos.y >= height || tiles[pos.y][pos.x] !== "door") {
+      throw new Error(`Room ${data.id}: door '${d.id}' at (${pos.x},${pos.y}) isn't a 'door' tile in the grid`);
+    }
+    return { id: d.id, x: pos.x, y: pos.y, to: d.to };
+  });
+
   const boxes = resolvePlacements(data.id, data.boxes ?? [], width, height, realSize);
+
+  const unplaced = data.unplaced ?? [];
+  for (const boxId of unplaced) {
+    getBox(boxId); // throws if missing
+  }
 
   return {
     id: data.id,
@@ -283,8 +378,8 @@ function parseRoom(data: RoomJson): Room {
     boxes,
     realSize,
     worldOrigin: data.worldOrigin ?? { x: 0, y: 0 },
-    doorSide: data.doorSide,
-    doorTo: data.doorTo,
+    doors,
+    unplaced,
   };
 }
 
@@ -369,32 +464,35 @@ export function isWalkableWorld(wx: number, wy: number): boolean {
   return hit !== null && isWalkable(hit.room, hit.lx, hit.ly);
 }
 
-function findDoorTileLocal(room: Room): { x: number; y: number } | null {
-  for (let y = 0; y < room.height; y++) {
-    for (let x = 0; x < room.width; x++) {
-      if (room.tiles[y][x] === "door") return { x, y };
-    }
-  }
-  return null;
+export function getDoor(room: Room, doorId: string): Door | null {
+  return room.doors.find((d) => d.id === doorId) ?? null;
 }
 
-const INWARD_FROM_WALL: Record<DoorSide, { dx: number; dy: number }> = {
-  top: { dx: 0, dy: 0 },
-  bottom: { dx: 0, dy: 0 },
-  left: { dx: 0, dy: 0 },
-  right: { dx: 0, dy: 0 },
-};
+export function getDoorAt(room: Room, x: number, y: number): Door | null {
+  return room.doors.find((d) => d.x === x && d.y === y) ?? null;
+}
 
-/**
- * World-space block a player should land on when entering `room` through its
- * door — the door tile itself, stepped one block inward from its wall.
- */
-export function entryPointForRoom(room: Room): { x: number; y: number } | null {
-  const doorLocal = findDoorTileLocal(room);
-  if (!doorLocal) return null;
-  const inward = INWARD_FROM_WALL[room.doorSide ?? "bottom"];
-  return {
-    x: room.worldOrigin.x + doorLocal.x + inward.dx,
-    y: room.worldOrigin.y + doorLocal.y + inward.dy,
-  };
+/** World-space block a player should land on when entering `room` through its door `doorId`. */
+export function entryPointForDoor(room: Room, doorId: string): { x: number; y: number } | null {
+  const door = getDoor(room, doorId);
+  if (!door) return null;
+  return { x: room.worldOrigin.x + door.x, y: room.worldOrigin.y + door.y };
+}
+
+// Cross-room validation: every door's `to` must reference a real room and a
+// real door on it. Deferred until every room has parsed (a room's doors can
+// reference rooms that parse later in iteration order).
+for (const room of allRoomsList) {
+  for (const door of room.doors) {
+    if (!door.to) continue;
+    const target = rooms[door.to.room];
+    if (!target) {
+      throw new Error(`Room ${room.id}: door '${door.id}' leads to unknown room '${door.to.room}'`);
+    }
+    if (!getDoor(target, door.to.door)) {
+      throw new Error(
+        `Room ${room.id}: door '${door.id}' leads to '${door.to.room}'/'${door.to.door}', which has no door with that id`,
+      );
+    }
+  }
 }

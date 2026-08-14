@@ -8,7 +8,8 @@ import {
   isWalkable,
   isWalkableWorld,
   findRoomContainingWorldPoint,
-  entryPointForRoom,
+  getDoorAt,
+  entryPointForDoor,
   worldBounds,
   getBoxAt,
   resolveBox,
@@ -177,10 +178,12 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     if (!hit || !isWalkable(hit.room, hit.lx, hit.ly)) return;
 
     // Doors teleport on contact: step onto the tile and land at the linked
-    // room's door instead of actually moving into this one.
-    if (hit.room.tiles[hit.ly][hit.lx] === "door" && hit.room.doorTo) {
-      const target = rooms[hit.room.doorTo];
-      const entry = target ? entryPointForRoom(target) : null;
+    // door instead of actually moving into this one. A stub door (no `to`)
+    // just sits there.
+    if (hit.room.tiles[hit.ly][hit.lx] === "door") {
+      const door = getDoorAt(hit.room, hit.lx, hit.ly);
+      const target = door?.to ? rooms[door.to.room] : undefined;
+      const entry = target && door?.to ? entryPointForDoor(target, door.to.door) : null;
       if (entry) {
         player.x = entry.x;
         player.y = entry.y;

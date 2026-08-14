@@ -2,12 +2,6 @@
   "id": "desk-drawer",
   "label": "Desk drawer",
   "contents": [
-    { "type": "item", "label": "USB-C cables (x3)" },
-    { "type": "item", "label": "AirPods case" },
-    { "type": "potion", "effectId": "adderall", "label": "Pop an Adderall" },
-    { "type": "potion", "effectId": "hungry", "label": "Notice hunger" },
-    { "type": "potion", "effectId": "stoked", "label": "Get stoked" },
-    { "type": "potion", "effectId": "irritated", "label": "Get irritated" },
     { "type": "box", "boxId": "desk-drawer-tools" }
   ]
 }
