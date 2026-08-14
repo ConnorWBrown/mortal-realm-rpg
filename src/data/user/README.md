@@ -37,58 +37,92 @@ src/data/user/
 Copy `src/data/rooms/office.json` as a starting point. Fields:
 
 - `id` — string. Match an existing id to override it, or pick a new one. Every
-  loaded room is reachable via doors (`doorTo`, see below) — there's no
+  loaded room is reachable via doors (see `doors` below) — there's no
   separate "active room" concept.
 - `name` — display name.
-- A room's layout comes from **either** `size` **or** `grid`/`legend` — pick one:
-  - `size` — `{ "feet": number, "inches": number }`, the real-world side
-    length of the room's **interior** (floor area — walls are added on top,
-    not counted in this measurement). The game generates a square layout for
-    you: a one-block wall ring around a floor of `blocksForDimension(size)`
-    blocks per side, plus one door. Each block is an approximation of
-    `FEET_PER_BLOCK` (3) real-world feet, rounded **up** — so a 16'0" interior
-    becomes `ceil(16*12 / 36) = 6` floor blocks, plus a wall block on each
-    side, 8 blocks total. See `src/world/measure.ts` for the conversion and
-    `src/world/room.ts` for the generator. Only square rooms are supported
-    this way for now.
-  - `doorSide` — optional, one of `"top"`, `"bottom"`, `"left"`, `"right"`
-    (default `"bottom"`). Only used with `size`; picks which wall the door
-    sits in the middle of.
+- A room's layout comes from **one of** `size`, `lobes`, or `grid`/`legend`:
+  - `size` — `{ "width": {feet, inches}, "depth": {feet, inches} }`, the
+    real-world size of the room's **interior** (floor area — walls are added
+    on top, not counted in this measurement). Shorthand for a single-lobe
+    `lobes: [{ id: "main", size }]` — see `lobes` just below for anything
+    that isn't a plain rectangle.
+  - `lobes` — array of real-world rectangles that union together into this
+    room's floor plan; use this instead of `size` for a non-rectangular room
+    (an L-shape, a rectangle with a closet nook, etc). Each entry:
+    ```json
+    { "id": "main", "size": { "width": {"feet":9,"inches":0}, "depth": {"feet":9,"inches":0} } }
+    ```
+    ```json
+    {
+      "id": "nook",
+      "size": { "width": {"feet":3,"inches":0}, "depth": {"feet":3,"inches":0} },
+      "at": { "x": {"feet":9,"inches":0}, "y": {"feet":6,"inches":0} }
+    }
+    ```
+    `at` is this lobe's top-left corner, real-world, relative to the room's
+    shared origin — omit it (defaults to `{0,0}`) on whichever lobe anchors
+    the room, and give every other lobe an explicit offset from that origin.
+    Each lobe is rounded outward to blocks independently (never smaller than
+    reality, same rule as `size`); any grid cell not covered by a lobe's
+    floor becomes wall, including a "notch" cell that's inside the bounding
+    box but outside the union (e.g. the missing corner of an L). Give doors
+    and boxes a `lobe` id (see below) to say which rectangle they belong to.
+  - For either `size` or `lobes`, each block approximates `FEET_PER_BLOCK`
+    (3) real-world feet, rounded **up** — so a 9'0" lobe becomes 3 floor
+    blocks, plus a wall block around the outside. See `src/world/measure.ts`
+    for the conversion and `src/world/room.ts` for the generator.
   - `legend` — maps single characters used in `grid` to a tile kind: one of
     `"floor"`, `"wall"`, `"door"`. Required if you hand-author `grid`.
   - `grid` — array of equal-length strings, one per row, using only
-    characters defined in `legend`. Use this instead of `size` when you want
-    a hand-drawn, non-square, or irregular layout.
-- `spawn` — `{ "x": number, "y": number }`, must land on a floor tile. For a
-  `size`-generated room, floor tiles are the inner `blocksForDimension(size)`
-  square, i.e. `x` and `y` in `[1, blocksForDimension(size)]` (index 0 and
-  the last index are the wall ring).
+    characters defined in `legend`. Use this instead of `size`/`lobes` when
+    you want full manual control over an irregular layout — no real-world
+    dimensions are tracked this way, and box placement is limited to
+    `fromWall: "left"/"top"` with no fit/overlap validation (see `boxes`
+    below).
+- `spawn` — `{ "x": number, "y": number }`, must land on a floor tile.
+- `doors` — array of this room's doors:
+  ```json
+  { "id": "toKitchen", "side": "right", "lobe": "main", "to": { "room": "kitchen", "door": "toLivingroom" } }
+  ```
+  `id` is unique within this room — other rooms' doors reference it in their
+  own `to`. `side` (`"top"`/`"bottom"`/`"left"`/`"right"`) places the door at
+  the middle of that wall, for a `size`/`lobes` room; `lobe` says which lobe
+  that wall belongs to (required when the room has more than one lobe,
+  defaults to the sole lobe otherwise). A `size`/`lobes` room only fits one
+  door per wall per lobe — hand-author a `grid` (and give the door explicit
+  `x`/`y` instead of `side`/`lobe`) if you need more. `to` is the room + door
+  id on the other side; omit it for a stub door that's walkable but doesn't
+  teleport (e.g. an unmodeled exterior exit). Pair doors on both rooms
+  (`to` on each pointing at the other) for a door that works both ways —
+  every `to` is validated at load time (unknown room, or a room with no
+  matching door id, throws).
 - `boxes` — array of real-world-anchored placements:
   ```json
   {
     "boxId": "desk",
+    "lobe": "main",
     "x": { "fromWall": "left", "offset": { "feet": 1, "inches": 0 } },
     "y": { "fromWall": "top", "offset": { "feet": 0, "inches": 0 } }
   }
   ```
   `boxId` must reference a real box id (default or user-defined) with a
-  `size` (see Box schema below) or the game will fail to load. `x.fromWall`
-  is `"left"` or `"right"`; `y.fromWall` is `"top"` or `"bottom"`; `offset`
-  is the real-world distance from that wall to the box's near edge —
-  `{ "feet": 0, "inches": 0 }` means flush against it. `fromWall: "right"`
-  or `"bottom"` requires the room to have a `size` (there's no far wall to
-  measure from otherwise).
+  `size` (see Box schema below) or the game will fail to load. `lobe` says
+  which lobe `x`/`y` are relative to (required when the room has more than
+  one lobe, defaults to the sole lobe otherwise; irrelevant for a hand-drawn
+  `grid` room). `x.fromWall` is `"left"` or `"right"`; `y.fromWall` is
+  `"top"` or `"bottom"`; `offset` is the real-world distance from that wall
+  to the box's near edge — `{ "feet": 0, "inches": 0 }` means flush against
+  it. `fromWall: "right"` or `"bottom"` requires the box's lobe (or room, for
+  a hand-drawn `grid`) to have a real-world size to measure from.
 
   The box's `size` is floored to blocks (minimum 1) for its footprint, and
   its offset floored the same way for its position — see
   `src/world/measure.ts` for why objects round down while rooms round up.
   At load time the room checks the box's *true* (unrounded) rectangle
-  against the room's true interior and against every other box's true
-  rectangle; if something doesn't actually fit or two boxes actually
-  overlap, it's logged as a console warning but the room still loads and
-  renders the approximate block layout regardless. This assumes a room with
-  a one-block wall ring around a rectangular interior — true of every
-  `size`-generated room.
+  against its lobe's true interior and against every other box's true
+  rectangle (room-wide, regardless of lobe); if something doesn't actually
+  fit or two boxes actually overlap, it's logged as a console warning but
+  the room still loads and renders the approximate block layout regardless.
 - `unplaced` — optional array of box ids known to be in this room but not
   yet given a placement (no size and/or no exact position figured out yet).
   Each id must reference a real box (default or user-defined) or the game
@@ -103,8 +137,6 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
   rooms to actually touch). Give each room in a house a distinct origin so
   they don't visually overlap; origins across different houses can be
   anything since they're never shown on screen together.
-- `doorTo` — optional room id this room's one door leads to. Pair it with a
-  `doorTo` back on the target room if you want the door to work both ways.
 
 ## Box schema
 

@@ -22,7 +22,7 @@ Deploys to GitHub Pages automatically on push to `main` via `.github/workflows/d
 
 Every content type (rooms, boxes, effects, quests) lives as JSON under `src/data/<type>/` and is eagerly globbed at build time in the corresponding `src/world/*.ts` module (e.g. `src/world/room.ts` globs `src/data/rooms/*.json`). A bad reference (missing box id, unknown tile char, out-of-bounds placement) throws at load time and the app won't boot — check the browser console.
 
-**User-local overrides**: `src/data/user/{rooms,boxes}/` is gitignored (see `src/data/user/README.md`) and also globbed; entries there replace default rooms/boxes with the same `id` entirely (no field-level merge). Effects and quests are not user-overridable this way. Note the game currently only ever loads the room with id `"office"` — there's no multi-room navigation yet, despite `doorTo`/`worldOrigin` plumbing existing for it.
+**User-local overrides**: `src/data/user/{rooms,boxes}/` is gitignored (see `src/data/user/README.md`) and also globbed; entries there replace default rooms/boxes with the same `id` entirely (no field-level merge). `src/data/user/box-contents/*.json` is different — it *appends* to a tracked box's `contents` by `boxId` rather than replacing the box, which is how a box's structure (id/sprite/size/nested sub-boxes) can be committed while its personal contents (items/notes/potions) stay local-only. Effects and quests are not user-overridable this way. Every loaded room is reachable via doors (`doors[]`, see below) — there's no separate "active room" concept, and all rooms across all houses currently load into one shared world simultaneously.
 
 ### Real-world measurement system (`src/world/measure.ts`)
 
@@ -32,7 +32,7 @@ Rooms and boxes are authored in feet/inches (`Dimension = {feet, inches}`), not 
 
 Because of this, block counts alone can't prove a placement is valid. `src/world/room.ts`'s `resolvePlacements` computes true (inch-precision) rectangles for every box, validates fit/overlap against those, and only *then* derives the clamped block rectangle used for rendering/collision — violations are logged as `console.warn` but never thrown; the room still loads with the approximate layout.
 
-A room's layout comes from either `size` (auto-generates a square room: one-block wall ring + door) or a hand-authored `grid`/`legend` pair — see field docs in `src/world/room.ts` and the schema writeup in `src/data/user/README.md`.
+A room's layout comes from `size` (a single real-world rectangle), `lobes` (several real-world rectangles unioned together, for a non-rectangular room — an L-shape, a rectangle with a nook, etc; each box/door then declares which `lobe` it belongs to), or a hand-authored `grid`/`legend` pair (full manual control, no real-world dimensions tracked). A room can have any number of `doors[]`, each independently targeting a specific door id on another room (or no target, for a stub door that doesn't teleport) — see field docs in `src/world/room.ts` and the schema writeup in `src/data/user/README.md`.
 
 ### Boxes, contents, and potions
 

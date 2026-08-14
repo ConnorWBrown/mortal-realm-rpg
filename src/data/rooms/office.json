@@ -1,7 +1,7 @@
 {
   "id": "office",
   "name": "Office",
-  "size": { "feet": 16, "inches": 0 },
+  "size": { "width": { "feet": 16, "inches": 0 }, "depth": { "feet": 16, "inches": 0 } },
   "worldOrigin": { "x": 0, "y": 0 },
   "doors": [
     { "id": "toBedroom", "side": "right", "to": { "room": "bedroom", "door": "toOffice" } }

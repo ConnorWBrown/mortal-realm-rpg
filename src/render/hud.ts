@@ -51,12 +51,14 @@ export function renderEffectHUD(view: View, player: Player) {
 
 /** Nameplate badge drawn inside a room's own top-left corner, in world space,
  * so it pans/scrolls with that room rather than following the player.
- * Shows real-world size (e.g. `16'0" SQ`) for rooms generated from `size` —
- * see src/world/measure.ts and room.ts. */
+ * Shows real-world size (e.g. `16'0"x12'0"`) for single-lobe rooms — see
+ * src/world/measure.ts and room.ts. */
 export function renderRoomLabels(view: View, rooms: Room[], cam: Camera) {
   const { ctx } = view;
   for (const room of rooms) {
-    const label = room.realSize ? `${room.name} ${formatDimension(room.realSize)} SQ` : room.name;
+    const label = room.realSize
+      ? `${room.name} ${formatDimension(room.realSize.width)}x${formatDimension(room.realSize.depth)}`
+      : room.name;
     const w = textWidth(label);
     const x = room.worldOrigin.x * TILE_SIZE - cam.x + HUD_MARGIN;
     const y = room.worldOrigin.y * TILE_SIZE - cam.y + HUD_MARGIN;
