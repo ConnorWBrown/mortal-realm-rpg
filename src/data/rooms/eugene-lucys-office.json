@@ -1,0 +1,10 @@
+{
+  "id": "eugene-lucys-office",
+  "name": "Lucy's Office",
+  "size": { "feet": 10, "inches": 0 },
+  "worldOrigin": { "x": 30, "y": 0 },
+  "spawn": { "x": 2, "y": 2 },
+  "doors": [
+    { "id": "toHallway", "side": "bottom", "to": { "room": "eugene-hallway", "door": "toLucysOffice" } }
+  ]
+}
