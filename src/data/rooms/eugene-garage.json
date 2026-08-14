@@ -1,7 +1,7 @@
 {
   "id": "eugene-garage",
   "name": "Garage",
-  "size": { "feet": 10, "inches": 0 },
+  "size": { "width": { "feet": 10, "inches": 0 }, "depth": { "feet": 10, "inches": 0 } },
   "worldOrigin": { "x": 30, "y": 30 },
   "spawn": { "x": 2, "y": 2 },
   "doors": [

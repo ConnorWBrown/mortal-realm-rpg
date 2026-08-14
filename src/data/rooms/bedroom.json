@@ -1,7 +1,7 @@
 {
   "id": "bedroom",
   "name": "Bedroom",
-  "size": { "feet": 12, "inches": 0 },
+  "size": { "width": { "feet": 12, "inches": 0 }, "depth": { "feet": 12, "inches": 0 } },
   "worldOrigin": { "x": 9, "y": 1 },
   "doors": [
     { "id": "toOffice", "side": "left", "to": { "room": "office", "door": "toBedroom" } }

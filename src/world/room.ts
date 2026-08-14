@@ -1,9 +1,15 @@
 import { getBox, type Box } from "./box";
-import { blocksForDimension, blocksForDimensionFloor, toInches, INCHES_PER_BLOCK, type Dimension } from "./measure";
+import { blocksForDimensionFloor, toInches, INCHES_PER_BLOCK, type Dimension } from "./measure";
 
 export type TileKind = "floor" | "wall" | "door";
 export type Wall = "top" | "bottom" | "left" | "right";
 export type DoorSide = Wall;
+
+/** A real-world rectangle: width along x, depth along y. */
+export interface RectSize {
+  width: Dimension;
+  depth: Dimension;
+}
 
 /** A resolved box footprint in room-grid coordinates (wall ring included in the grid). */
 export interface BoxPlacement {
@@ -40,8 +46,8 @@ export interface Room {
   tiles: TileKind[][];
   spawn: { x: number; y: number };
   boxes: BoxPlacement[];
-  /** Real-world side length this room was generated from, if any. See `size` below. */
-  realSize?: Dimension;
+  /** Real-world size this room was generated from, if it has exactly one lobe. See `size`/`lobes` below. */
+  realSize?: RectSize;
   /**
    * This room's top-left corner in world-space blocks. Rooms are laid out
    * side by side in one shared coordinate space (with gaps of unwalkable
@@ -61,7 +67,8 @@ export interface Room {
 
 /**
  * Where a box's near edge sits, real-world, relative to one wall of the
- * room. `offset: {feet: 0, inches: 0}` means flush against that wall.
+ * room (or of `lobe`, for a multi-lobe room). `offset: {feet: 0, inches: 0}`
+ * means flush against that wall.
  */
 export interface AxisOffsetJson {
   fromWall: Wall;
@@ -74,37 +81,57 @@ export interface BoxPlacementJson {
   x: AxisOffsetJson;
   /** Must reference "top" or "bottom". */
   y: AxisOffsetJson;
+  /** Which lobe's walls `x`/`y` are relative to. Required when the room has more than one lobe; defaults to the sole lobe otherwise. */
+  lobe?: string;
 }
 
 /**
- * A door on a `size`-generated square room: placed at the middle of the
- * given wall. For hand-authored `grid` rooms, use `x`/`y` instead — the
- * room's exact layout is already known, so there's no wall to compute a
- * midpoint from.
+ * A door on a `size`/`lobes`-generated room: placed at the middle of the
+ * given wall of the given lobe. For hand-authored `grid` rooms, use `x`/`y`
+ * instead — the room's exact layout is already known, so there's no wall to
+ * compute a midpoint from.
  */
 export interface DoorJson {
   id: string;
   side?: DoorSide;
+  /** Which lobe `side` is relative to. Required when the room has more than one lobe; defaults to the sole lobe otherwise. */
+  lobe?: string;
   x?: number;
   y?: number;
   /** Room + door id on the other side. Omit for a stub door that doesn't teleport (e.g. an unmodeled exterior exit). */
   to?: DoorTarget;
 }
 
+/**
+ * One real-world rectangle in a `lobes`-authored room. Several lobes union
+ * together into one (possibly non-rectangular) room — e.g. a main rectangle
+ * plus a smaller closet nook — each rounded outward to blocks independently
+ * and never smaller than reality, same as `size` (see src/world/measure.ts).
+ */
+export interface LobeJson {
+  id: string;
+  size: RectSize;
+  /** This lobe's top-left corner, real-world, relative to the room's shared origin. Defaults to {0,0} — exactly one lobe should normally anchor there; give every other lobe an explicit offset from it. */
+  at?: { x: Dimension; y: Dimension };
+}
+
 interface RoomJson {
   id: string;
   name: string;
   /**
-   * Real-world side length of the square room's INTERIOR (floor area only —
-   * walls are added on top of this, not counted in it). When present,
-   * `grid`/`legend` are ignored (and may be omitted): a square room is
-   * generated automatically. The interior is `blocksForDimension(size)`
-   * floor blocks per side (each block approximating FEET_PER_BLOCK feet,
-   * rounded up), surrounded by a one-block-thick wall — so a 16'0" room is
-   * 6 floor blocks plus a wall block on each side, 8 blocks total. See
-   * src/world/measure.ts.
+   * Real-world size of the room's INTERIOR (floor area only — walls are
+   * added on top of this, not counted in it). Shorthand for a single-lobe
+   * `lobes: [{ id: "main", size }]` — see `lobes` below for non-rectangular
+   * rooms. Mutually exclusive with `lobes` and with `grid`/`legend`.
    */
-  size?: Dimension;
+  size?: RectSize;
+  /**
+   * Real-world rectangles that union together into this room's floor plan —
+   * use this instead of `size` for a non-rectangular room (an L-shape, a
+   * rectangle with a nook, etc). See `LobeJson`. Mutually exclusive with
+   * `size` and with `grid`/`legend`.
+   */
+  lobes?: LobeJson[];
   /** This room's top-left corner in world-space blocks. Defaults to {0,0}. */
   worldOrigin?: { x: number; y: number };
   legend?: Record<string, TileKind>;
@@ -120,109 +147,203 @@ interface RoomJson {
   unplaced?: string[];
 }
 
-/**
- * Places one door per requested side at the middle of that side (throws if
- * two doors share a side — hand-author a `grid` instead if that's needed).
- * Returns the grid/legend plus each door's resolved (x, y).
- */
-function generateSquareRoom(
-  roomId: string,
-  interiorBlocks: number,
-  doorSpecs: { id: string; side: DoorSide }[],
-): { legend: Record<string, TileKind>; grid: string[]; positions: Record<string, { x: number; y: number }> } {
-  // The measured size is the interior (floor) footprint; a one-block wall
-  // ring goes around it, so a 16'0" / 6-block interior is 8 blocks total.
-  const blocks = interiorBlocks + 2;
-  const legend: Record<string, TileKind> = { "#": "wall", ".": "floor", D: "door" };
-  const mid = Math.floor(blocks / 2);
-
-  const positions: Record<string, { x: number; y: number }> = {};
-  const bySide = new Map<DoorSide, string>();
-  for (const spec of doorSpecs) {
-    if (bySide.has(spec.side)) {
-      throw new Error(
-        `Room ${roomId}: doors '${bySide.get(spec.side)}' and '${spec.id}' both sit on the "${spec.side}" wall — a size-generated room only fits one door per wall (hand-author a 'grid' for more).`,
-      );
-    }
-    bySide.set(spec.side, spec.id);
-    const pos =
-      spec.side === "top"
-        ? { x: mid, y: 0 }
-        : spec.side === "bottom"
-          ? { x: mid, y: blocks - 1 }
-          : spec.side === "left"
-            ? { x: 0, y: mid }
-            : { x: blocks - 1, y: mid };
-    positions[spec.id] = pos;
-  }
-
-  const grid: string[] = [];
-  for (let y = 0; y < blocks; y++) {
-    let row = "";
-    for (let x = 0; x < blocks; x++) {
-      const border = x === 0 || y === 0 || x === blocks - 1 || y === blocks - 1;
-      const isDoor = doorSpecs.some((s) => positions[s.id].x === x && positions[s.id].y === y);
-      row += isDoor ? "D" : border ? "#" : ".";
-    }
-    grid.push(row);
-  }
-  return { legend, grid, positions };
-}
-
-interface ResolvedFootprint {
-  boxId: string;
-  /** True (real-world, inches) rectangle — the source of truth for "does this actually fit". */
+/** A lobe, resolved to both its true (inches) rectangle and its block-grid rectangle within the room's shared grid. */
+interface ResolvedLobe {
+  id: string;
+  /** True (real-world, inches) rectangle, in room-space (already includes this lobe's `at` offset). */
   trueLeft: number;
   trueTop: number;
   trueWidth: number;
   trueDepth: number;
-  /** Block-grid rectangle (approximate) — the source of truth for rendering/collision. */
+  /** Block-grid rectangle (outward-rounded from the true rectangle, then translated into the room's shared, padded grid). */
   blockX: number;
   blockY: number;
+  blockWidth: number;
+  blockHeight: number;
+}
+
+interface ResolvedLobes {
+  list: ResolvedLobe[];
+  /** Shared room-wide translation from an un-padded true-inches-derived block coordinate into this room's grid space. */
+  blockOffset: { x: number; y: number };
+}
+
+/**
+ * Unions each lobe's outward-rounded (never-smaller-than-reality) block
+ * rectangle into one room grid, padded by a one-block wall ring around the
+ * tightest bounding box of the whole union. Any grid cell not covered by a
+ * lobe's floor becomes wall — including "notch" cells inside the bounding
+ * box but outside the union (e.g. the missing corner of an L-shape), same
+ * as a hand-drawn grid would fill them.
+ *
+ * Each door is placed at the middle of its lobe's requested wall side; if
+ * that position isn't actually an exterior wall in the unioned grid (e.g.
+ * another lobe covers that side, or extends past it), this throws — pick a
+ * different side, or hand-author a `grid` for finer control.
+ */
+function generateLobedRoom(
+  roomId: string,
+  lobeInputs: { id: string; trueLeft: number; trueTop: number; trueWidth: number; trueDepth: number }[],
+  doorSpecs: { id: string; lobe: string; side: DoorSide }[],
+): {
+  legend: Record<string, TileKind>;
+  grid: string[];
+  positions: Record<string, { x: number; y: number }>;
+  lobes: ResolvedLobes;
+} {
+  if (lobeInputs.length === 0) {
+    throw new Error(`Room ${roomId}: needs at least one lobe`);
+  }
+
+  const spans = lobeInputs.map((l) => ({
+    id: l.id,
+    trueLeft: l.trueLeft,
+    trueTop: l.trueTop,
+    trueWidth: l.trueWidth,
+    trueDepth: l.trueDepth,
+    bx0: Math.floor(l.trueLeft / INCHES_PER_BLOCK),
+    by0: Math.floor(l.trueTop / INCHES_PER_BLOCK),
+    bx1: Math.ceil((l.trueLeft + l.trueWidth) / INCHES_PER_BLOCK),
+    by1: Math.ceil((l.trueTop + l.trueDepth) / INCHES_PER_BLOCK),
+  }));
+
+  const minBX = Math.min(...spans.map((s) => s.bx0));
+  const minBY = Math.min(...spans.map((s) => s.by0));
+  const maxBX = Math.max(...spans.map((s) => s.bx1));
+  const maxBY = Math.max(...spans.map((s) => s.by1));
+
+  // One-block wall-ring margin around the tightest bounding box of the whole union.
+  const blockOffset = { x: 1 - minBX, y: 1 - minBY };
+  const width = maxBX - minBX + 2;
+  const height = maxBY - minBY + 2;
+
+  const lobes: ResolvedLobe[] = spans.map((s) => ({
+    id: s.id,
+    trueLeft: s.trueLeft,
+    trueTop: s.trueTop,
+    trueWidth: s.trueWidth,
+    trueDepth: s.trueDepth,
+    blockX: s.bx0 + blockOffset.x,
+    blockY: s.by0 + blockOffset.y,
+    blockWidth: s.bx1 - s.bx0,
+    blockHeight: s.by1 - s.by0,
+  }));
+  const lobeById = new Map(lobes.map((l) => [l.id, l]));
+
+  const floor = new Set<string>();
+  for (const l of lobes) {
+    for (let y = l.blockY; y < l.blockY + l.blockHeight; y++) {
+      for (let x = l.blockX; x < l.blockX + l.blockWidth; x++) {
+        floor.add(`${x},${y}`);
+      }
+    }
+  }
+
+  const legend: Record<string, TileKind> = { "#": "wall", ".": "floor", D: "door" };
+  const gridRows: string[][] = [];
+  for (let y = 0; y < height; y++) {
+    const row: string[] = [];
+    for (let x = 0; x < width; x++) {
+      row.push(floor.has(`${x},${y}`) ? "." : "#");
+    }
+    gridRows.push(row);
+  }
+
+  const positions: Record<string, { x: number; y: number }> = {};
+  for (const spec of doorSpecs) {
+    const lobe = lobeById.get(spec.lobe);
+    if (!lobe) throw new Error(`Room ${roomId}: door '${spec.id}' references unknown lobe '${spec.lobe}'`);
+    const midX = lobe.blockX + Math.floor(lobe.blockWidth / 2);
+    const midY = lobe.blockY + Math.floor(lobe.blockHeight / 2);
+    const pos =
+      spec.side === "top"
+        ? { x: midX, y: lobe.blockY - 1 }
+        : spec.side === "bottom"
+          ? { x: midX, y: lobe.blockY + lobe.blockHeight }
+          : spec.side === "left"
+            ? { x: lobe.blockX - 1, y: midY }
+            : { x: lobe.blockX + lobe.blockWidth, y: midY };
+
+    if (pos.x < 0 || pos.y < 0 || pos.x >= width || pos.y >= height || gridRows[pos.y][pos.x] !== "#") {
+      throw new Error(
+        `Room ${roomId}: door '${spec.id}' (lobe '${spec.lobe}', side "${spec.side}") doesn't land on an exterior wall — check for lobe overlap/adjacency on that side, or pick a different side (or hand-author a 'grid' for finer control)`,
+      );
+    }
+    gridRows[pos.y][pos.x] = "D";
+    positions[spec.id] = pos;
+  }
+
+  return {
+    legend,
+    grid: gridRows.map((r) => r.join("")),
+    positions,
+    lobes: { list: lobes, blockOffset },
+  };
+}
+
+interface ResolvedFootprint {
+  boxId: string;
+  lobeId: string | undefined;
+  /** True (real-world, inches) rectangle, in room-space — the source of truth for "does this actually fit". */
+  trueLeft: number;
+  trueTop: number;
+  trueWidth: number;
+  trueDepth: number;
+  /** Block-grid rectangle (approximate, un-translated — see `ResolvedLobes.blockOffset`). */
+  blockXRaw: number;
+  blockYRaw: number;
   widthBlocks: number;
   depthBlocks: number;
 }
 
 /**
- * Converts each `size`/`fromWall`+`offset`-authored placement into both a
- * true (inches) rectangle and a block-grid rectangle, then validates the
- * true rectangles: does each box actually fit inside the room, and do any
- * two boxes actually overlap? Violations are logged as warnings, never
- * thrown — the room still loads and renders the (approximate) block
- * rectangles regardless. See src/world/measure.ts for why block counts
- * alone can't be trusted for this check.
+ * Converts each `fromWall`+`offset`-authored placement into both a true
+ * (inches) rectangle, in room-space, and a block-grid rectangle, then
+ * validates the true rectangles: does each box actually fit inside its lobe,
+ * and do any two boxes actually overlap? Violations are logged as warnings,
+ * never thrown — the room still loads and renders the (approximate) block
+ * rectangles regardless. See src/world/measure.ts for why block counts alone
+ * can't be trusted for this check.
  *
- * Assumes a room with a one-block wall ring around a rectangular interior
- * (true of every `size`-generated room, and of hand-drawn `grid` rooms that
- * follow the same convention).
+ * A room with no lobes (a hand-drawn `grid` without `size`/`lobes`) falls
+ * back to the legacy behavior: only `fromWall: "left"/"top"` is allowed (no
+ * room size to measure "right"/"bottom" from), and there's no fit/overlap
+ * validation — just block placement, assuming a one-block wall ring.
  */
 function resolvePlacements(
   roomId: string,
   raw: BoxPlacementJson[],
   gridWidth: number,
   gridHeight: number,
-  realSize: Dimension | undefined,
+  lobes: ResolvedLobes | undefined,
 ): BoxPlacement[] {
-  const interiorWidthBlocks = gridWidth - 2;
-  const interiorDepthBlocks = gridHeight - 2;
-  const roomTrueWidthIn = realSize ? toInches(realSize) : undefined;
-  const roomTrueDepthIn = roomTrueWidthIn; // square rooms only, for now
+  const lobeById = new Map((lobes?.list ?? []).map((l) => [l.id, l]));
+  const singleLobeId = lobes && lobes.list.length === 1 ? lobes.list[0].id : undefined;
+  const blockOffset = lobes ? lobes.blockOffset : { x: 1, y: 1 };
+  const fallbackInteriorWidth = gridWidth - 2;
+  const fallbackInteriorHeight = gridHeight - 2;
 
   const resolved: ResolvedFootprint[] = raw.map((p) => {
     const box = getBox(p.boxId); // throws if missing
     if (!box.size) {
       throw new Error(`Room ${roomId}: box '${p.boxId}' has no 'size' (width/depth) and can't be placed`);
     }
-    if ((p.x.fromWall === "right" || p.y.fromWall === "bottom") && roomTrueWidthIn === undefined) {
-      throw new Error(
-        `Room ${roomId}: box '${p.boxId}' is offset from the ${p.x.fromWall === "right" ? "right" : "bottom"} wall, which requires the room to declare a real-world 'size'`,
-      );
-    }
     if (p.x.fromWall !== "left" && p.x.fromWall !== "right") {
       throw new Error(`Room ${roomId}: box '${p.boxId}' x.fromWall must be "left" or "right"`);
     }
     if (p.y.fromWall !== "top" && p.y.fromWall !== "bottom") {
       throw new Error(`Room ${roomId}: box '${p.boxId}' y.fromWall must be "top" or "bottom"`);
+    }
+
+    const lobeId = p.lobe ?? singleLobeId;
+    const lobe = lobeId ? lobeById.get(lobeId) : undefined;
+    if (lobes && lobes.list.length > 1 && !lobe) {
+      throw new Error(`Room ${roomId}: box '${p.boxId}' needs a 'lobe' (room has more than one)`);
+    }
+    if (!lobe && (p.x.fromWall === "right" || p.y.fromWall === "bottom")) {
+      throw new Error(
+        `Room ${roomId}: box '${p.boxId}' is offset from the ${p.x.fromWall === "right" ? "right" : "bottom"} wall, which requires the room to declare a real-world 'size'/'lobes'`,
+      );
     }
 
     const trueWidth = toInches(box.size.width);
@@ -232,98 +353,136 @@ function resolvePlacements(
 
     const offsetX = toInches(p.x.offset);
     const offsetY = toInches(p.y.offset);
-    const trueLeft = p.x.fromWall === "left" ? offsetX : (roomTrueWidthIn as number) - offsetX - trueWidth;
-    const trueTop = p.y.fromWall === "top" ? offsetY : (roomTrueDepthIn as number) - offsetY - trueDepth;
-
-    const blockX = Math.max(0, Math.floor(trueLeft / INCHES_PER_BLOCK));
-    const blockY = Math.max(0, Math.floor(trueTop / INCHES_PER_BLOCK));
+    const localLeft = p.x.fromWall === "left" ? offsetX : (lobe as ResolvedLobe).trueWidth - offsetX - trueWidth;
+    const localTop = p.y.fromWall === "top" ? offsetY : (lobe as ResolvedLobe).trueDepth - offsetY - trueDepth;
+    const trueLeft = (lobe?.trueLeft ?? 0) + localLeft;
+    const trueTop = (lobe?.trueTop ?? 0) + localTop;
 
     return {
       boxId: p.boxId,
+      lobeId: lobe?.id,
       trueLeft,
       trueTop,
       trueWidth,
       trueDepth,
-      blockX,
-      blockY,
+      blockXRaw: Math.floor(trueLeft / INCHES_PER_BLOCK),
+      blockYRaw: Math.floor(trueTop / INCHES_PER_BLOCK),
       widthBlocks,
       depthBlocks,
     };
   });
 
-  // True-dimension validation — only meaningful once we know the room's real size.
-  if (roomTrueWidthIn !== undefined && roomTrueDepthIn !== undefined) {
-    for (const r of resolved) {
-      if (r.trueLeft < 0 || r.trueLeft + r.trueWidth > roomTrueWidthIn) {
-        console.warn(
-          `[room:${roomId}] '${r.boxId}' is ${r.trueWidth}" wide but doesn't fit at its placed offset within the room's ${roomTrueWidthIn}" true width — loading the approximate block layout anyway.`,
-        );
-      }
-      if (r.trueTop < 0 || r.trueTop + r.trueDepth > roomTrueDepthIn) {
-        console.warn(
-          `[room:${roomId}] '${r.boxId}' is ${r.trueDepth}" deep but doesn't fit at its placed offset within the room's ${roomTrueDepthIn}" true depth — loading the approximate block layout anyway.`,
-        );
-      }
+  // True-dimension fit check — only meaningful for a box placed in a known lobe.
+  for (const r of resolved) {
+    const lobe = r.lobeId ? lobeById.get(r.lobeId) : undefined;
+    if (!lobe) continue;
+    const localLeft = r.trueLeft - lobe.trueLeft;
+    const localTop = r.trueTop - lobe.trueTop;
+    if (localLeft < 0 || localLeft + r.trueWidth > lobe.trueWidth) {
+      console.warn(
+        `[room:${roomId}] '${r.boxId}' is ${r.trueWidth}" wide but doesn't fit at its placed offset within lobe '${lobe.id}'s ${lobe.trueWidth}" true width — loading the approximate block layout anyway.`,
+      );
     }
-    for (let i = 0; i < resolved.length; i++) {
-      for (let j = i + 1; j < resolved.length; j++) {
-        const a = resolved[i];
-        const b = resolved[j];
-        const overlapX = a.trueLeft < b.trueLeft + b.trueWidth && b.trueLeft < a.trueLeft + a.trueWidth;
-        const overlapY = a.trueTop < b.trueTop + b.trueDepth && b.trueTop < a.trueTop + a.trueDepth;
-        if (overlapX && overlapY) {
-          console.warn(
-            `[room:${roomId}] '${a.boxId}' and '${b.boxId}' overlap at their true dimensions — loading the approximate block layout anyway.`,
-          );
-        }
+    if (localTop < 0 || localTop + r.trueDepth > lobe.trueDepth) {
+      console.warn(
+        `[room:${roomId}] '${r.boxId}' is ${r.trueDepth}" deep but doesn't fit at its placed offset within lobe '${lobe.id}'s ${lobe.trueDepth}" true depth — loading the approximate block layout anyway.`,
+      );
+    }
+  }
+  // True-dimension overlap check — meaningful room-wide regardless of lobe.
+  for (let i = 0; i < resolved.length; i++) {
+    for (let j = i + 1; j < resolved.length; j++) {
+      const a = resolved[i];
+      const b = resolved[j];
+      const overlapX = a.trueLeft < b.trueLeft + b.trueWidth && b.trueLeft < a.trueLeft + a.trueWidth;
+      const overlapY = a.trueTop < b.trueTop + b.trueDepth && b.trueTop < a.trueTop + a.trueDepth;
+      if (overlapX && overlapY) {
+        console.warn(
+          `[room:${roomId}] '${a.boxId}' and '${b.boxId}' overlap at their true dimensions — loading the approximate block layout anyway.`,
+        );
       }
     }
   }
 
-  // Clamp block rectangles to the interior so nothing can index outside the
-  // tile grid, even when the true dimensions above didn't actually fit.
+  // Translate into grid space and clamp to the owning lobe (or, with no
+  // lobe, the whole grid's interior) so nothing can index outside the tiles
+  // array, even when the true dimensions above didn't actually fit.
   return resolved.map((r) => {
-    const widthBlocks = Math.min(r.widthBlocks, interiorWidthBlocks);
-    const depthBlocks = Math.min(r.depthBlocks, interiorDepthBlocks);
-    const blockX = Math.max(0, Math.min(r.blockX, interiorWidthBlocks - widthBlocks));
-    const blockY = Math.max(0, Math.min(r.blockY, interiorDepthBlocks - depthBlocks));
-    return {
-      boxId: r.boxId,
-      x: 1 + blockX,
-      y: 1 + blockY,
-      widthBlocks,
-      depthBlocks,
-    };
+    const lobe = r.lobeId ? lobeById.get(r.lobeId) : undefined;
+    const boundX = lobe ? lobe.blockX : 1;
+    const boundY = lobe ? lobe.blockY : 1;
+    const boundWidth = lobe ? lobe.blockWidth : fallbackInteriorWidth;
+    const boundHeight = lobe ? lobe.blockHeight : fallbackInteriorHeight;
+
+    const widthBlocks = Math.min(r.widthBlocks, boundWidth);
+    const depthBlocks = Math.min(r.depthBlocks, boundHeight);
+    const translatedX = r.blockXRaw + blockOffset.x;
+    const translatedY = r.blockYRaw + blockOffset.y;
+    const blockX = Math.max(boundX, Math.min(translatedX, boundX + boundWidth - widthBlocks));
+    const blockY = Math.max(boundY, Math.min(translatedY, boundY + boundHeight - depthBlocks));
+    return { boxId: r.boxId, x: blockX, y: blockY, widthBlocks, depthBlocks };
   });
 }
 
 function parseRoom(data: RoomJson): Room {
   let legend = data.legend;
   let grid = data.grid;
-  let realSize: Dimension | undefined;
+  let realSize: RectSize | undefined;
   const doorsJson = data.doors ?? [];
-  let sizeGeneratedPositions: Record<string, { x: number; y: number }> = {};
+  let generatedPositions: Record<string, { x: number; y: number }> = {};
+  let resolvedLobes: ResolvedLobes | undefined;
 
-  if (data.size) {
-    const interiorBlocks = blocksForDimension(data.size);
-    for (const d of doorsJson) {
+  if (data.size && data.lobes) {
+    throw new Error(`Room ${data.id}: specify either 'size' or 'lobes', not both`);
+  }
+  const lobeSpecsJson: LobeJson[] | undefined = data.size ? [{ id: "main", size: data.size }] : data.lobes;
+
+  if (lobeSpecsJson) {
+    const lobeIds = new Set<string>();
+    const lobeInputs = lobeSpecsJson.map((l) => {
+      if (lobeIds.has(l.id)) throw new Error(`Room ${data.id}: duplicate lobe id '${l.id}'`);
+      lobeIds.add(l.id);
+      return {
+        id: l.id,
+        trueLeft: l.at ? toInches(l.at.x) : 0,
+        trueTop: l.at ? toInches(l.at.y) : 0,
+        trueWidth: toInches(l.size.width),
+        trueDepth: toInches(l.size.depth),
+      };
+    });
+    const singleLobeId = lobeInputs.length === 1 ? lobeInputs[0].id : undefined;
+
+    const seenDoorSides = new Set<string>();
+    const doorSpecs = doorsJson.map((d) => {
       if (!d.side) {
-        throw new Error(`Room ${data.id}: door '${d.id}' needs a 'side' (size-generated rooms can't take explicit x/y)`);
+        throw new Error(`Room ${data.id}: door '${d.id}' needs a 'side' ('size'/'lobes' rooms can't take explicit x/y)`);
       }
-    }
-    const generated = generateSquareRoom(
-      data.id,
-      interiorBlocks,
-      doorsJson.map((d) => ({ id: d.id, side: d.side as DoorSide })),
-    );
+      const lobeId = d.lobe ?? singleLobeId;
+      if (!lobeId) {
+        throw new Error(`Room ${data.id}: door '${d.id}' needs a 'lobe' (room has more than one)`);
+      }
+      const key = `${lobeId}|${d.side}`;
+      if (seenDoorSides.has(key)) {
+        throw new Error(
+          `Room ${data.id}: more than one door on lobe '${lobeId}' side "${d.side}" — a generated room only fits one door per wall per lobe (hand-author a 'grid' for more)`,
+        );
+      }
+      seenDoorSides.add(key);
+      return { id: d.id, lobe: lobeId, side: d.side as DoorSide };
+    });
+
+    const generated = generateLobedRoom(data.id, lobeInputs, doorSpecs);
     legend = generated.legend;
     grid = generated.grid;
-    sizeGeneratedPositions = generated.positions;
-    realSize = data.size;
+    generatedPositions = generated.positions;
+    resolvedLobes = generated.lobes;
+    if (lobeInputs.length === 1) {
+      realSize = lobeSpecsJson[0].size;
+    }
   }
 
   if (!grid || !legend) {
-    throw new Error(`Room ${data.id}: must specify either 'size' or both 'grid' and 'legend'`);
+    throw new Error(`Room ${data.id}: must specify 'size', 'lobes', or both 'grid' and 'legend'`);
   }
 
   const height = grid.length;
@@ -351,7 +510,7 @@ function parseRoom(data: RoomJson): Room {
     }
     seenDoorIds.add(d.id);
 
-    const pos = data.size ? sizeGeneratedPositions[d.id] : { x: d.x, y: d.y };
+    const pos = resolvedLobes ? generatedPositions[d.id] : { x: d.x, y: d.y };
     if (pos.x === undefined || pos.y === undefined) {
       throw new Error(`Room ${data.id}: door '${d.id}' needs explicit 'x'/'y' (hand-authored 'grid' rooms can't derive a position from 'side')`);
     }
@@ -361,7 +520,7 @@ function parseRoom(data: RoomJson): Room {
     return { id: d.id, x: pos.x, y: pos.y, to: d.to };
   });
 
-  const boxes = resolvePlacements(data.id, data.boxes ?? [], width, height, realSize);
+  const boxes = resolvePlacements(data.id, data.boxes ?? [], width, height, resolvedLobes);
 
   const unplaced = data.unplaced ?? [];
   for (const boxId of unplaced) {

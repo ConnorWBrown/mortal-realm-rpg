@@ -1,7 +1,7 @@
 {
   "id": "eugene-bedroom",
   "name": "Bedroom",
-  "size": { "feet": 10, "inches": 0 },
+  "size": { "width": { "feet": 10, "inches": 0 }, "depth": { "feet": 10, "inches": 0 } },
   "worldOrigin": { "x": 20, "y": 15 },
   "spawn": { "x": 2, "y": 2 },
   "doors": [

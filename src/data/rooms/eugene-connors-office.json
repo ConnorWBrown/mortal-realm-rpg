@@ -1,7 +1,7 @@
 {
   "id": "eugene-connors-office",
   "name": "Connor's Office",
-  "size": { "feet": 10, "inches": 0 },
+  "size": { "width": { "feet": 10, "inches": 0 }, "depth": { "feet": 10, "inches": 0 } },
   "worldOrigin": { "x": 15, "y": 0 },
   "spawn": { "x": 2, "y": 2 },
   "doors": [
