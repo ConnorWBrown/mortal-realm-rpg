@@ -60,7 +60,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   const view = createView(canvas);
   const roomList = Object.values(rooms);
   const bounds = worldBounds();
-  const homeRoom = rooms.office;
+  const homeRoom = rooms["eugene-livingroom"];
   const spawn = {
     x: homeRoom.worldOrigin.x + homeRoom.spawn.x,
     y: homeRoom.worldOrigin.y + homeRoom.spawn.y,
