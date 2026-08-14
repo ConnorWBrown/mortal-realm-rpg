@@ -3,8 +3,9 @@
   "name": "Bedroom",
   "size": { "feet": 12, "inches": 0 },
   "worldOrigin": { "x": 9, "y": 1 },
-  "doorSide": "left",
-  "doorTo": "office",
+  "doors": [
+    { "id": "toOffice", "side": "left", "to": { "room": "office", "door": "toBedroom" } }
+  ],
   "spawn": { "x": 2, "y": 2 },
   "boxes": []
 }

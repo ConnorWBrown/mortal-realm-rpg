@@ -14,25 +14,31 @@ A file here with the same `id` as a default one **replaces it entirely**
 (no field-level merging); a new `id` just adds a new room or box. There's no
 UI for any of this — you write the JSON by hand and reload the page.
 
+`box-contents/` is different: it doesn't override a box, it **appends** to
+one's `contents` array (see "Box contents overlay" below). This is how a
+box's structure (id, sprite, size, nested sub-boxes) can live in tracked
+data while its personal contents (items/notes/potions) stay local-only.
+
 ## Layout
 
 ```
 src/data/user/
   rooms/
-    office.json     # overrides the default "office" room
+    my-house-kitchen.json   # a new room, id "my-house-kitchen"
   boxes/
-    desk.json        # overrides the default "desk" box
-    my-nightstand.json  # a new box, id "my-nightstand"
+    desk.json                # overrides the default "desk" box
+    my-nightstand.json       # a new box, id "my-nightstand"
+  box-contents/
+    my-nightstand.json       # appends personal contents to "my-nightstand"
 ```
 
 ## Room schema
 
 Copy `src/data/rooms/office.json` as a starting point. Fields:
 
-- `id` — string. Match an existing id to override it, or pick a new one.
-  Note: the game currently only ever loads the room with id `"office"` (there's
-  no multi-room navigation yet), so to change what you actually see, your
-  room's `id` must be `"office"`.
+- `id` — string. Match an existing id to override it, or pick a new one. Every
+  loaded room is reachable via doors (`doorTo`, see below) — there's no
+  separate "active room" concept.
 - `name` — display name.
 - A room's layout comes from **either** `size` **or** `grid`/`legend` — pick one:
   - `size` — `{ "feet": number, "inches": number }`, the real-world side
@@ -83,6 +89,22 @@ Copy `src/data/rooms/office.json` as a starting point. Fields:
   renders the approximate block layout regardless. This assumes a room with
   a one-block wall ring around a rectangular interior — true of every
   `size`-generated room.
+- `unplaced` — optional array of box ids known to be in this room but not
+  yet given a placement (no size and/or no exact position figured out yet).
+  Each id must reference a real box (default or user-defined) or the game
+  will fail to load, but otherwise this is pure capture: nothing renders on
+  the grid and nothing is interactable in-game yet. Move an id from here into
+  `boxes` (and give its box a `size`) once you know where it actually goes.
+- `worldOrigin` — optional `{ "x": number, "y": number }`, this room's
+  top-left corner in shared world-space blocks (default `{0,0}`). Rooms are
+  laid out side by side purely so a door's teleport has a "from" and "to";
+  physical adjacency doesn't matter for gameplay (walking through a door
+  jumps the player to the target room's entry point, it doesn't require the
+  rooms to actually touch). Give each room in a house a distinct origin so
+  they don't visually overlap; origins across different houses can be
+  anything since they're never shown on screen together.
+- `doorTo` — optional room id this room's one door leads to. Pair it with a
+  `doorTo` back on the target room if you want the door to work both ways.
 
 ## Box schema
 
@@ -109,6 +131,30 @@ every entry type). Fields:
   - `{ "type": "potion", "effectId": string, "label"?: string, "detail"?: string }`
     — `effectId` must match one of the ids in `src/data/effects/` (effects
     aren't user-overridable yet).
+
+## Box contents overlay
+
+If you want a box's *structure* tracked (so it's committed — e.g. "there's a
+6ft bookshelf against the window") but its *contents* private (the actual
+books), put the structure in `src/data/boxes/<id>.json` as normal, keeping
+`contents` limited to `{ "type": "box", ... }` entries for any nested
+sub-boxes (or `contents: []` if none), and put the personal entries in
+`src/data/user/box-contents/<id>.json`:
+
+```json
+{
+  "boxId": "bookshelf",
+  "contents": [
+    { "type": "item", "label": "Framed photo" }
+  ]
+}
+```
+
+At load time these entries are appended to the tracked box's `contents`
+(tracked entries first, then overlay entries) — `boxId` must reference a real
+box or the game will fail to load. This is a one-way append, not a
+field-by-field merge, and unlike `rooms/`/`boxes/` overrides, the filename
+doesn't have to match anything — only the `boxId` field inside matters.
 
 ## Gotchas
 
