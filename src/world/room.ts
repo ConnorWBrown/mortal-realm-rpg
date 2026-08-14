@@ -631,6 +631,22 @@ export function getDoorAt(room: Room, x: number, y: number): Door | null {
   return room.doors.find((d) => d.x === x && d.y === y) ?? null;
 }
 
+/** `room` plus every room directly reachable from it through one of its doors — used to
+ * limit rendering to the room the player is in and its immediate neighbors. */
+export function visibleRooms(room: Room): Room[] {
+  const seen = new Set<string>([room.id]);
+  const result: Room[] = [room];
+  for (const door of room.doors) {
+    if (!door.to) continue;
+    const target = rooms[door.to.room];
+    if (target && !seen.has(target.id)) {
+      seen.add(target.id);
+      result.push(target);
+    }
+  }
+  return result;
+}
+
 /** World-space block a player should land on when entering `room` through its door `doorId`. */
 export function entryPointForDoor(room: Room, doorId: string): { x: number; y: number } | null {
   const door = getDoor(room, doorId);

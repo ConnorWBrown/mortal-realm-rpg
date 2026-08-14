@@ -13,6 +13,7 @@ import {
   worldBounds,
   getBoxAt,
   resolveBox,
+  visibleRooms,
 } from "../world/room";
 import { createPlayer, isMoving, type Player } from "../world/player";
 import { applyEffect, getEffect, removeEffectAt } from "../world/effect";
@@ -58,7 +59,6 @@ export interface Game {
 export function createGame(canvas: HTMLCanvasElement): Game {
   const input = createInput();
   const view = createView(canvas);
-  const roomList = Object.values(rooms);
   const bounds = worldBounds();
   const homeRoom = rooms["eugene-livingroom"];
   const spawn = {
@@ -243,11 +243,13 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   function render() {
     clear(view, BG_COLOR);
     const cam = computeCamera(bounds, player, view);
-    renderRoom(view, roomList, cam, assets);
-    renderBoxes(view, roomList, cam, assets);
+    const hit = findRoomContainingWorldPoint(player.x, player.y);
+    const visible = hit ? visibleRooms(hit.room) : [];
+    renderRoom(view, visible, cam, assets);
+    renderBoxes(view, visible, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    renderRoomLabels(view, roomList, cam);
+    renderRoomLabels(view, visible, cam);
     if (!isMenuOpen(menus)) {
       renderSidebar(
         view,
