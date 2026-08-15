@@ -1,7 +1,9 @@
 import { getBox, type Box } from "./box";
 import { blocksForDimensionFloor, toInches, INCHES_PER_BLOCK, type Dimension } from "./measure";
 
-export type TileKind = "floor" | "wall" | "door" | "grass";
+/** `void` is an invisible, unwalkable tile — used to cap off decorative areas
+ * (like the grass just outside an exit) without drawing a wall around them. */
+export type TileKind = "floor" | "wall" | "door" | "grass" | "void";
 export type Wall = "top" | "bottom" | "left" | "right";
 export type DoorSide = Wall;
 
@@ -552,7 +554,8 @@ export function getBoxAt(room: Room, x: number, y: number): BoxPlacement | null 
 
 export function isWalkable(room: Room, x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= room.width || y >= room.height) return false;
-  if (room.tiles[y][x] === "wall") return false;
+  const kind = room.tiles[y][x];
+  if (kind === "wall" || kind === "void") return false;
   if (getBoxAt(room, x, y)) return false;
   return true;
 }

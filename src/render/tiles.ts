@@ -65,8 +65,9 @@ function drawTileKind(
   y: number,
   assets: Assets | null,
 ) {
-  if (kind === "floor") {
-    // Floor is just the background colour — no sprite.
+  if (kind === "floor" || kind === "void") {
+    // Floor and void are both just the background colour — no sprite. Void
+    // differs only in that it's unwalkable (see isWalkable).
     return;
   }
   if (!assets) {
