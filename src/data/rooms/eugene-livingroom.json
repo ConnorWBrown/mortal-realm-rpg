@@ -1,19 +1,19 @@
 {
   "id": "eugene-livingroom",
   "name": "Living Room",
-  "worldOrigin": { "x": 31, "y": 15 },
-  "legend": { "#": "wall", ".": "floor", "D": "door", "g": "grass" },
+  "worldOrigin": { "x": 34, "y": 15 },
+  "legend": { "#": "wall", ".": "floor", "D": "door", "g": "grass", "v": "void" },
   "grid": [
-    "###########",
-    "#####.....D",
-    "#gggD.....#",
-    "#####.....D",
-    "###########"
+    "v#######",
+    "g#.....D",
+    "gD.....#",
+    "g#.....D",
+    "v#######"
   ],
-  "spawn": { "x": 5, "y": 1 },
+  "spawn": { "x": 2, "y": 1 },
   "doors": [
-    { "id": "frontDoor", "x": 4, "y": 2 },
-    { "id": "toKitchen", "x": 10, "y": 1, "to": { "room": "eugene-kitchen", "door": "toLivingroom" } },
-    { "id": "toHallway", "x": 10, "y": 3, "to": { "room": "eugene-hallway", "door": "toLivingroom" } }
+    { "id": "frontDoor", "x": 1, "y": 2 },
+    { "id": "toKitchen", "x": 7, "y": 1, "to": { "room": "eugene-kitchen", "door": "toLivingroom" } },
+    { "id": "toHallway", "x": 7, "y": 3, "to": { "room": "eugene-hallway", "door": "toLivingroom" } }
   ]
 }
