@@ -1,7 +1,7 @@
 import { getBox, type Box } from "./box";
 import { blocksForDimensionFloor, toInches, INCHES_PER_BLOCK, type Dimension } from "./measure";
 
-export type TileKind = "floor" | "wall" | "door";
+export type TileKind = "floor" | "wall" | "door" | "grass";
 export type Wall = "top" | "bottom" | "left" | "right";
 export type DoorSide = Wall;
 

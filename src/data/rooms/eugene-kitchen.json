@@ -1,19 +1,20 @@
 {
   "id": "eugene-kitchen",
   "name": "Kitchen",
-  "worldOrigin": { "x": 0, "y": 30 },
-  "legend": { "#": "wall", ".": "floor", "D": "door" },
+  "worldOrigin": { "x": -4, "y": 30 },
+  "legend": { "#": "wall", ".": "floor", "D": "door", "g": "grass" },
   "grid": [
-    "###D###",
-    "#.....#",
-    "D.....#",
-    "#.....#",
-    "###D###"
+    "#######D###",
+    "####D.....#",
+    "#####.....D",
+    "#gggD.....#",
+    "###########"
   ],
-  "spawn": { "x": 3, "y": 2 },
+  "spawn": { "x": 7, "y": 2 },
   "doors": [
-    { "id": "toSunroom", "x": 3, "y": 0, "to": { "room": "eugene-sunroom", "door": "toKitchen" } },
-    { "id": "toLivingroom", "x": 0, "y": 2, "to": { "room": "eugene-livingroom", "door": "toKitchen" } },
-    { "id": "toGarage", "x": 3, "y": 4, "to": { "room": "eugene-garage", "door": "toKitchen" } }
+    { "id": "toGarage", "x": 7, "y": 0, "to": { "room": "eugene-garage", "door": "toKitchen" } },
+    { "id": "toLivingroom", "x": 4, "y": 1, "to": { "room": "eugene-livingroom", "door": "toKitchen" } },
+    { "id": "toSunroom", "x": 10, "y": 2, "to": { "room": "eugene-sunroom", "door": "toKitchen" } },
+    { "id": "backDoor", "x": 4, "y": 3 }
   ]
 }
