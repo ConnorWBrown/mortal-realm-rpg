@@ -5,6 +5,6 @@
   "worldOrigin": { "x": 15, "y": 0 },
   "spawn": { "x": 2, "y": 2 },
   "doors": [
-    { "id": "toHallway", "side": "bottom", "to": { "room": "eugene-hallway", "door": "toConnorsOffice" } }
+    { "id": "toHallway", "side": "top", "to": { "room": "eugene-hallway", "door": "toConnorsOffice" } }
   ]
 }

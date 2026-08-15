@@ -11,8 +11,10 @@ export const BG_COLOR = "#3e2731";
 // Hand-picked from tile-picker.html visual inspection:
 //   wall  → col 0,  row 13  (brick pattern)
 //   door  → col 20, row 12
+//   grass → col 5,  row 0   (grass tufts on ground)
 const WALL_CR = { col: 0, row: 13 };
 const DOOR_CR = { col: 20, row: 12 };
+const GRASS_CR = { col: 5, row: 0 };
 
 const PLAYER_BODY = "#e8d8b0";
 const PLAYER_SHADE = "#a89060";
@@ -68,8 +70,8 @@ function drawTileKind(
     return;
   }
   if (!assets) {
-    // Fallback before assets load: solid block so walls/doors are visible.
-    ctx.fillStyle = kind === "wall" ? "#6b4a3a" : "#8a5a2a";
+    // Fallback before assets load: solid block so walls/doors/grass are visible.
+    ctx.fillStyle = kind === "wall" ? "#6b4a3a" : kind === "grass" ? "#3a6b3a" : "#8a5a2a";
     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
     return;
   }
@@ -77,6 +79,8 @@ function drawTileKind(
     drawTileCoord(ctx, assets.indoor, WALL_CR.col, WALL_CR.row, x, y);
   } else if (kind === "door") {
     drawTileCoord(ctx, assets.indoor, DOOR_CR.col, DOOR_CR.row, x, y);
+  } else if (kind === "grass") {
+    drawTileCoord(ctx, assets.indoor, GRASS_CR.col, GRASS_CR.row, x, y);
   }
 }
 

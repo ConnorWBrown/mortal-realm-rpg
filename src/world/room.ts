@@ -1,7 +1,7 @@
 import { getBox, type Box } from "./box";
 import { blocksForDimensionFloor, toInches, INCHES_PER_BLOCK, type Dimension } from "./measure";
 
-export type TileKind = "floor" | "wall" | "door";
+export type TileKind = "floor" | "wall" | "door" | "grass";
 export type Wall = "top" | "bottom" | "left" | "right";
 export type DoorSide = Wall;
 
@@ -647,10 +647,28 @@ export function visibleRooms(room: Room): Room[] {
   return result;
 }
 
-/** World-space block a player should land on when entering `room` through its door `doorId`. */
+/**
+ * World-space block a player should land on when entering `room` through its
+ * door `doorId` — the walkable floor tile next to the door, not the door
+ * tile itself, so the player always steps into the room rather than
+ * sometimes stalling on the threshold.
+ */
 export function entryPointForDoor(room: Room, doorId: string): { x: number; y: number } | null {
   const door = getDoor(room, doorId);
   if (!door) return null;
+  const neighbors = [
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+  ];
+  for (const { dx, dy } of neighbors) {
+    const nx = door.x + dx;
+    const ny = door.y + dy;
+    if (isWalkable(room, nx, ny) && room.tiles[ny][nx] === "floor") {
+      return { x: room.worldOrigin.x + nx, y: room.worldOrigin.y + ny };
+    }
+  }
   return { x: room.worldOrigin.x + door.x, y: room.worldOrigin.y + door.y };
 }
 
