@@ -1,7 +1,7 @@
 import { createInput, type Direction, type InputState } from "./input";
 import { createView, clear } from "../render/canvas";
 import { BG_COLOR, computeCamera, renderRoom, renderBoxes, renderPlayer } from "../render/tiles";
-import { renderEffectHUD, renderRoomLabels } from "../render/hud";
+import { renderEffectHUD, renderRoomLabels, renderDoorLabels } from "../render/hud";
 import { loadAssets, type Assets } from "../render/assets";
 import {
   rooms,
@@ -250,6 +250,7 @@ export function createGame(canvas: HTMLCanvasElement): Game {
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
     renderRoomLabels(view, visible, cam);
+    renderDoorLabels(view, visible, cam, player);
     if (!isMenuOpen(menus)) {
       renderSidebar(
         view,
