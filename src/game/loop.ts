@@ -10,10 +10,12 @@ import {
   findRoomContainingWorldPoint,
   getDoorAt,
   entryPointForDoor,
-  worldBounds,
   getBoxAt,
   resolveBox,
   visibleRooms,
+  layoutForRender,
+  boundsOfRooms,
+  worldBounds,
 } from "../world/room";
 import { createPlayer, isMoving, type Player } from "../world/player";
 import { applyEffect, getEffect, removeEffectAt } from "../world/effect";
@@ -59,7 +61,6 @@ export interface Game {
 export function createGame(canvas: HTMLCanvasElement): Game {
   const input = createInput();
   const view = createView(canvas);
-  const bounds = worldBounds();
   const homeRoom = rooms["eugene-livingroom"];
   const spawn = {
     x: homeRoom.worldOrigin.x + homeRoom.spawn.x,
@@ -242,14 +243,15 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function render() {
     clear(view, BG_COLOR);
-    const cam = computeCamera(bounds, player, view);
     const hit = findRoomContainingWorldPoint(player.x, player.y);
     const visible = hit ? visibleRooms(hit.room) : [];
-    renderRoom(view, visible, cam, assets);
-    renderBoxes(view, visible, cam, assets);
+    const display = hit ? layoutForRender(hit.room, visible) : visible;
+    const cam = computeCamera(display.length > 0 ? boundsOfRooms(display) : worldBounds(), player, view);
+    renderRoom(view, display, cam, assets);
+    renderBoxes(view, display, cam, assets);
     renderPlayer(view, player, cam);
     renderEffectHUD(view, player);
-    renderRoomLabels(view, visible, cam);
+    renderRoomLabels(view, display, cam);
     renderDoorLabels(view, visible, cam, player);
     if (!isMenuOpen(menus)) {
       renderSidebar(

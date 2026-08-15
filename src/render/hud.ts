@@ -1,7 +1,7 @@
 import type { View } from "./canvas";
 import type { Player } from "../world/player";
 import type { Room } from "../world/room";
-import { rooms } from "../world/room";
+import { rooms, interiorOffset } from "../world/room";
 import type { Camera } from "./tiles";
 import { TILE_SIZE } from "./tiles";
 import { formatDimension } from "../world/measure";
@@ -103,24 +103,4 @@ export function renderDoorLabels(view: View, visible: Room[], cam: Camera, playe
       drawText(ctx, label, x, y);
     }
   }
-}
-
-/** Direction (in tiles) from a door toward an adjacent walkable floor tile —
- * the "inside" of the room, as opposed to whatever's on the door's other
- * (exterior) side. Defaults to "above" if the door is somehow floor-less on
- * all four sides. */
-function interiorOffset(room: Room, dx: number, dy: number): { dx: number; dy: number } {
-  const candidates = [
-    { dx: 0, dy: 1 },
-    { dx: 0, dy: -1 },
-    { dx: 1, dy: 0 },
-    { dx: -1, dy: 0 },
-  ];
-  for (const c of candidates) {
-    const nx = dx + c.dx;
-    const ny = dy + c.dy;
-    if (ny < 0 || ny >= room.height || nx < 0 || nx >= room.width) continue;
-    if (room.tiles[ny][nx] === "floor") return c;
-  }
-  return { dx: 0, dy: -1 };
 }
