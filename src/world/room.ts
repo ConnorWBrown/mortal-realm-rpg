@@ -593,19 +593,28 @@ export interface WorldBounds {
   maxY: number;
 }
 
-/** The union of every room's footprint in world-space blocks. Used to clamp the camera. */
-export function worldBounds(): WorldBounds {
+/** The union of `rooms`' footprints in world-space blocks, by their current
+ * `worldOrigin` — each room contributes whatever position it's holding when
+ * this is called, so passing `layoutForRender`'s output bounds the camera to
+ * what's actually being drawn this frame rather than every room's authored
+ * (and possibly far-off) position. */
+export function boundsOfRooms(rooms: Room[]): WorldBounds {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const r of allRoomsList) {
+  for (const r of rooms) {
     minX = Math.min(minX, r.worldOrigin.x);
     minY = Math.min(minY, r.worldOrigin.y);
     maxX = Math.max(maxX, r.worldOrigin.x + r.width);
     maxY = Math.max(maxY, r.worldOrigin.y + r.height);
   }
   return { minX, minY, maxX, maxY };
+}
+
+/** The union of every loaded room's footprint, at its authored `worldOrigin`. */
+export function worldBounds(): WorldBounds {
+  return boundsOfRooms(allRoomsList);
 }
 
 /** Which room (if any) occupies a world-space block, and the equivalent room-local coords. */
@@ -648,6 +657,68 @@ export function visibleRooms(room: Room): Room[] {
     }
   }
   return result;
+}
+
+/** Blocks of gap painted between a door and the matching door on a neighbor
+ * room placed nearby for rendering — see `layoutForRender`. */
+const NEIGHBOR_RENDER_GAP = 3;
+
+/**
+ * `visible` (as returned by `visibleRooms(focus)`), with every room other
+ * than `focus` given a synthetic `worldOrigin` for this frame's rendering
+ * only: each neighbor is repositioned so the door leading to it sits
+ * `NEIGHBOR_RENDER_GAP` blocks out from the matching door on `focus`, on the
+ * correct side. Rooms' authored `worldOrigin` — the one used for player
+ * position, collision, and door teleport targets — is untouched; this is a
+ * cosmetic placement so nearby rooms read as nearby regardless of how far
+ * apart their real (often scaffolded/placeholder) positions are.
+ */
+export function layoutForRender(focus: Room, visible: Room[]): Room[] {
+  return visible.map((room) => {
+    if (room.id === focus.id) return room;
+    const door = focus.doors.find((d) => d.to?.room === room.id);
+    const targetDoor = door?.to ? getDoor(room, door.to.door) : null;
+    if (!door || !targetDoor) return room;
+
+    const interior = interiorOffset(focus, door.x, door.y);
+    const normal = { dx: -interior.dx, dy: -interior.dy };
+    const doorWorldX = focus.worldOrigin.x + door.x;
+    const doorWorldY = focus.worldOrigin.y + door.y;
+    const targetDoorWorldX = doorWorldX + normal.dx * NEIGHBOR_RENDER_GAP;
+    const targetDoorWorldY = doorWorldY + normal.dy * NEIGHBOR_RENDER_GAP;
+
+    return {
+      ...room,
+      worldOrigin: {
+        x: targetDoorWorldX - targetDoor.x,
+        y: targetDoorWorldY - targetDoor.y,
+      },
+    };
+  });
+}
+
+/** Direction (in tiles) from a door toward an adjacent walkable floor tile —
+ * the "inside" of the room, as opposed to whatever's on the door's other
+ * (exterior) side. Defaults to "above" if the door is somehow floor-less on
+ * all four sides. Doors can't be found from their grid position alone
+ * (`size`/`lobes` rooms pad the grid with grass/void outside the wall ring,
+ * so a door isn't always on the room's outer bounding-box edge) — this is
+ * also used by `renderDoorLabels` in `render/hud.ts` to anchor a door's
+ * destination badge outside the wall rather than on the door tile itself. */
+export function interiorOffset(room: Room, dx: number, dy: number): { dx: number; dy: number } {
+  const candidates = [
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+  ];
+  for (const c of candidates) {
+    const nx = dx + c.dx;
+    const ny = dy + c.dy;
+    if (ny < 0 || ny >= room.height || nx < 0 || nx >= room.width) continue;
+    if (room.tiles[ny][nx] === "floor") return c;
+  }
+  return { dx: 0, dy: -1 };
 }
 
 /**
