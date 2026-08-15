@@ -4,17 +4,17 @@
   "worldOrigin": { "x": -1, "y": 30 },
   "legend": { "#": "wall", ".": "floor", "D": "door", "g": "grass", "v": "void" },
   "grid": [
-    "v###D###",
-    "vD.....#",
-    "g#.....D",
+    "g###D###",
     "gD.....#",
-    "g#######"
+    "g#.....D",
+    "vD.....#",
+    "v#######"
   ],
   "spawn": { "x": 4, "y": 2 },
   "doors": [
     { "id": "toGarage", "x": 4, "y": 0, "to": { "room": "eugene-garage", "door": "toKitchen" } },
-    { "id": "toLivingroom", "x": 1, "y": 1, "to": { "room": "eugene-livingroom", "door": "toKitchen" } },
+    { "id": "backDoor", "x": 1, "y": 1 },
     { "id": "toSunroom", "x": 7, "y": 2, "to": { "room": "eugene-sunroom", "door": "toKitchen" } },
-    { "id": "backDoor", "x": 1, "y": 3 }
+    { "id": "toLivingroom", "x": 1, "y": 3, "to": { "room": "eugene-livingroom", "door": "toKitchen" } }
   ]
 }

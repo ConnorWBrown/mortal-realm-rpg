@@ -1,6 +1,7 @@
 import type { View } from "./canvas";
 import type { Player } from "../world/player";
 import type { Room } from "../world/room";
+import { rooms } from "../world/room";
 import type { Camera } from "./tiles";
 import { TILE_SIZE } from "./tiles";
 import { formatDimension } from "../world/measure";
@@ -69,4 +70,57 @@ export function renderRoomLabels(view: View, rooms: Room[], cam: Camera) {
     ctx.fillStyle = "#e8d8b0";
     drawText(ctx, label, x, y);
   }
+}
+
+/** Badge showing where a door leads, shown only while the player is standing
+ * next to that door. Stub doors (no `to`, e.g. an unmodeled exterior exit)
+ * aren't labelled at all. Anchored one tile beyond the door on its exterior
+ * side — outside the wall rather than on the door tile itself — so it never
+ * paints over the door sprite; it's fine for it to land on whatever's out
+ * there (another room's tiles, void, grass). */
+export function renderDoorLabels(view: View, visible: Room[], cam: Camera, player: Player) {
+  const { ctx } = view;
+  for (const room of visible) {
+    for (const door of room.doors) {
+      if (!door.to) continue;
+      const worldX = room.worldOrigin.x + door.x;
+      const worldY = room.worldOrigin.y + door.y;
+      if (Math.max(Math.abs(worldX - player.x), Math.abs(worldY - player.y)) > 1) continue;
+
+      const label = rooms[door.to.room]?.name ?? door.to.room;
+      const inward = interiorOffset(room, door.x, door.y);
+      const anchorX = worldX - inward.dx;
+      const anchorY = worldY - inward.dy;
+
+      const w = textWidth(label);
+      const x = Math.round(anchorX * TILE_SIZE - cam.x + (TILE_SIZE - w) / 2);
+      const y = Math.round(anchorY * TILE_SIZE - cam.y + (TILE_SIZE - 5) / 2);
+      if (x + w < 0 || y < 0 || x > view.width || y > view.height) continue;
+
+      ctx.fillStyle = "rgba(26, 20, 32, 0.8)";
+      ctx.fillRect(x - BADGE_PAD, y - 1, w + BADGE_PAD * 2, 8);
+      ctx.fillStyle = "#e8d8b0";
+      drawText(ctx, label, x, y);
+    }
+  }
+}
+
+/** Direction (in tiles) from a door toward an adjacent walkable floor tile —
+ * the "inside" of the room, as opposed to whatever's on the door's other
+ * (exterior) side. Defaults to "above" if the door is somehow floor-less on
+ * all four sides. */
+function interiorOffset(room: Room, dx: number, dy: number): { dx: number; dy: number } {
+  const candidates = [
+    { dx: 0, dy: 1 },
+    { dx: 0, dy: -1 },
+    { dx: 1, dy: 0 },
+    { dx: -1, dy: 0 },
+  ];
+  for (const c of candidates) {
+    const nx = dx + c.dx;
+    const ny = dy + c.dy;
+    if (ny < 0 || ny >= room.height || nx < 0 || nx >= room.width) continue;
+    if (room.tiles[ny][nx] === "floor") return c;
+  }
+  return { dx: 0, dy: -1 };
 }
