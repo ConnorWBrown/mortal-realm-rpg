@@ -74,6 +74,23 @@ export function createGame(canvas: HTMLCanvasElement): Game {
   // Seed quests (merges any newly-added seed JSON files; always keeps a Default quest).
   player.quests = ensureDefaultQuest(mergeWithSeeds(player.quests));
 
+  // The room the player is currently in, and where it should be drawn this
+  // frame. Normally that's just the room's own authored `worldOrigin`, but
+  // while crossing a door (see the "door" branch in `update`) `focusOrigin`
+  // is instead carried over from wherever the target room was already being
+  // rendered as a neighbor — so the camera pans a couple of blocks rather
+  // than cutting to the target's real (often scaffolded, far-off) position.
+  // `moveFromRoomId`/`moveFromOrigin` are the same pair for whichever room
+  // `player.moveFrom` belongs to, needed only while a door-crossing tween is
+  // in flight (moveFrom and the current x/y briefly sit in two different
+  // rooms' coordinate systems).
+  const initialHit = findRoomContainingWorldPoint(player.x, player.y);
+  const initialRoom = initialHit?.room ?? homeRoom;
+  let focusRoomId = initialRoom.id;
+  let focusOrigin = { ...initialRoom.worldOrigin };
+  let moveFromRoomId = focusRoomId;
+  let moveFromOrigin = { ...focusOrigin };
+
   const menus: MenuStack = createMenuStack();
   const sidebar: Sidebar = createSidebar();
   let assets: Assets | null = null;
@@ -152,6 +169,8 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       player.moveProgress = Math.min(1, moveElapsed / MOVE_DURATION_MS);
       if (player.moveProgress >= 1) {
         player.moveFrom = { x: player.x, y: player.y };
+        moveFromRoomId = focusRoomId;
+        moveFromOrigin = focusOrigin;
         savePlayer(player);
       }
       return;
@@ -185,17 +204,31 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       const door = getDoorAt(hit.room, hit.lx, hit.ly);
       const target = door?.to ? rooms[door.to.room] : undefined;
       const entry = target && door?.to ? entryPointForDoor(target, door.to.door) : null;
-      if (entry) {
+      if (entry && target) {
+        // Carry the target room's *current* nearby-render position over as
+        // its new focusOrigin, instead of snapping to its real (often
+        // scaffolded, far-off) worldOrigin — so the crossing pans a couple
+        // of blocks instead of cutting to a different part of the world.
+        const preCrossDisplay = layoutForRender(hit.room, visibleRooms(hit.room), focusOrigin);
+        const targetDisplay = preCrossDisplay.find((r) => r.id === target.id);
+
+        moveFromRoomId = focusRoomId;
+        moveFromOrigin = focusOrigin;
+        focusRoomId = target.id;
+        focusOrigin = targetDisplay ? targetDisplay.worldOrigin : { ...target.worldOrigin };
+
+        player.moveFrom = { x: player.x, y: player.y };
         player.x = entry.x;
         player.y = entry.y;
-        player.moveFrom = { ...entry };
-        player.moveProgress = 1;
+        player.moveProgress = 0;
         moveElapsed = 0;
         savePlayer(player);
         return;
       }
     }
 
+    moveFromRoomId = focusRoomId;
+    moveFromOrigin = focusOrigin;
     player.moveFrom = { x: player.x, y: player.y };
     player.x = tx;
     player.y = ty;
@@ -243,13 +276,21 @@ export function createGame(canvas: HTMLCanvasElement): Game {
 
   function render() {
     clear(view, BG_COLOR);
-    const hit = findRoomContainingWorldPoint(player.x, player.y);
-    const visible = hit ? visibleRooms(hit.room) : [];
-    const display = hit ? layoutForRender(hit.room, visible) : visible;
-    const cam = computeCamera(display.length > 0 ? boundsOfRooms(display) : worldBounds(), player, view);
+    const focusRoom = rooms[focusRoomId];
+    const visible = focusRoom ? visibleRooms(focusRoom) : [];
+    const display = focusRoom ? layoutForRender(focusRoom, visible, focusOrigin) : visible;
+    // Render-space player: `moveFrom` and the live (x,y) can briefly belong
+    // to two different rooms' coordinate systems mid-crossing (see the
+    // "door" branch in `update`), so each is mapped through its own room's
+    // current render origin before lerping between them — that's what keeps
+    // a door crossing looking like one continuous step instead of a cut.
+    const renderFrom = toRenderPoint(player.moveFrom, moveFromRoomId, moveFromOrigin);
+    const renderPos = toRenderPoint({ x: player.x, y: player.y }, focusRoomId, focusOrigin);
+    const renderPlayerState: Player = { ...player, moveFrom: renderFrom, x: renderPos.x, y: renderPos.y };
+    const cam = computeCamera(display.length > 0 ? boundsOfRooms(display) : worldBounds(), renderPlayerState, view);
     renderRoom(view, display, cam, assets);
     renderBoxes(view, display, cam, assets);
-    renderPlayer(view, player, cam);
+    renderPlayer(view, renderPlayerState, cam);
     renderEffectHUD(view, player);
     renderRoomLabels(view, display, cam);
     renderDoorLabels(view, visible, cam, player);
@@ -277,6 +318,20 @@ export function createGame(canvas: HTMLCanvasElement): Game {
       });
     },
   };
+}
+
+/** Maps a true-world point known to belong to room `roomId` into render
+ * space, given that room's current render origin (its authored `worldOrigin`
+ * unless it's the focus room mid-crossing — see `focusOrigin` in
+ * `createGame`). */
+function toRenderPoint(
+  p: { x: number; y: number },
+  roomId: string,
+  origin: { x: number; y: number },
+): { x: number; y: number } {
+  const room = rooms[roomId];
+  if (!room) return p;
+  return { x: p.x + (origin.x - room.worldOrigin.x), y: p.y + (origin.y - room.worldOrigin.y) };
 }
 
 function heldDirection(input: InputState): Direction | null {

@@ -666,26 +666,29 @@ export function visibleRooms(room: Room): Room[] {
 const NEIGHBOR_RENDER_GAP = 2;
 
 /**
- * `visible` (as returned by `visibleRooms(focus)`), with every room other
- * than `focus` given a synthetic `worldOrigin` for this frame's rendering
- * only: each neighbor is repositioned so the door leading to it sits
- * `NEIGHBOR_RENDER_GAP` blocks out from the matching door on `focus`, on the
- * correct side. Rooms' authored `worldOrigin` — the one used for player
- * position, collision, and door teleport targets — is untouched; this is a
- * cosmetic placement so nearby rooms read as nearby regardless of how far
- * apart their real (often scaffolded/placeholder) positions are.
+ * `visible` (as returned by `visibleRooms(focus)`), with `focus` itself drawn
+ * at `focusOrigin` — which the caller may hold steady across a door crossing
+ * instead of always passing `focus.worldOrigin` (see `game/loop.ts`'s
+ * `focusOrigin` state) — and every other room given a synthetic `worldOrigin`
+ * for this frame's rendering only: each neighbor is repositioned so the door
+ * leading to it sits `NEIGHBOR_RENDER_GAP` blocks out from the matching door
+ * on `focus`, on the correct side. Rooms' authored `worldOrigin` — the one
+ * used for player position, collision, and door teleport targets — is
+ * untouched; this is a cosmetic placement so nearby rooms read as nearby
+ * regardless of how far apart their real (often scaffolded/placeholder)
+ * positions are.
  */
-export function layoutForRender(focus: Room, visible: Room[]): Room[] {
+export function layoutForRender(focus: Room, visible: Room[], focusOrigin: { x: number; y: number }): Room[] {
   return visible.map((room) => {
-    if (room.id === focus.id) return room;
+    if (room.id === focus.id) return { ...room, worldOrigin: focusOrigin };
     const door = focus.doors.find((d) => d.to?.room === room.id);
     const targetDoor = door?.to ? getDoor(room, door.to.door) : null;
     if (!door || !targetDoor) return room;
 
     const interior = interiorOffset(focus, door.x, door.y);
     const normal = { dx: -interior.dx, dy: -interior.dy };
-    const doorWorldX = focus.worldOrigin.x + door.x;
-    const doorWorldY = focus.worldOrigin.y + door.y;
+    const doorWorldX = focusOrigin.x + door.x;
+    const doorWorldY = focusOrigin.y + door.y;
     const targetDoorWorldX = doorWorldX + normal.dx * NEIGHBOR_RENDER_GAP;
     const targetDoorWorldY = doorWorldY + normal.dy * NEIGHBOR_RENDER_GAP;
 
