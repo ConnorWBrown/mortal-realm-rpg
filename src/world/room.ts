@@ -659,9 +659,11 @@ export function visibleRooms(room: Room): Room[] {
   return result;
 }
 
-/** Blocks of gap painted between a door and the matching door on a neighbor
- * room placed nearby for rendering — see `layoutForRender`. */
-const NEIGHBOR_RENDER_GAP = 3;
+/** Blocks between a door and the matching door on a neighbor room placed
+ * nearby for rendering — see `layoutForRender`. The two door tiles sit at
+ * the endpoints, so this leaves `NEIGHBOR_RENDER_GAP - 1` empty blocks
+ * between them (1 empty block at the current value of 2). */
+const NEIGHBOR_RENDER_GAP = 2;
 
 /**
  * `visible` (as returned by `visibleRooms(focus)`), with every room other
